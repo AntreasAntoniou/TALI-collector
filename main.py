@@ -39,91 +39,86 @@ def download_video_and_meta_data(url_idx, length, target_directory):
     # init an HTML Session
     video_url = f"https://www.youtube.com/watch?v={url_idx}"
 
+    youtube_object = pytube.YouTube(video_url)
+    video_dict = {
+        "captions": {},
+        "age_restricted": youtube_object.age_restricted,
+        "check_availability": youtube_object.check_availability(),
+        "title": youtube_object.title,
+        "rating": youtube_object.rating,
+        "length": youtube_object.length,
+        "views": youtube_object.views,
+        "author": youtube_object.author,
+        "meta_data": youtube_object.metadata.raw_metadata,
+    }
+
+    for caption_item in youtube_object.captions:
+        video_dict["captions"][f"{caption_item.code}"] = caption_item.xml_captions
+
+    if (
+        video_dict["age_restricted"]
+        or "en" not in video_dict["captions"]
+        and "a.en" not in video_dict["captions"]
+    ):
+        return url_idx, length, True
+
+    video = youtube_object.streams.get_highest_resolution()
+    video.download(output_path=f"{target_directory}/{url_idx}/", filename="full_video")
+
+    input_video_path = f"{target_directory}/{url_idx}/full_video.mp4"
+
+    save_dict_in_json(
+        filepath=f"{target_directory}/{url_idx}/meta_data",
+        metrics_dict=video_dict,
+        overwrite=True,
+    )
     try:
-        youtube_object = pytube.YouTube(video_url)
-        video_dict = {
-            "captions": {},
-            "age_restricted": youtube_object.age_restricted,
-            "check_availability": youtube_object.check_availability(),
-            "title": youtube_object.title,
-            "rating": youtube_object.rating,
-            "length": youtube_object.length,
-            "views": youtube_object.views,
-            "author": youtube_object.author,
-            "meta_data": youtube_object.metadata.raw_metadata,
-        }
+        with VideoFileClip(input_video_path) as video:
+            for _ in range(3):
+                duration = np.random.randint(
+                    low=1,
+                    high=10 if youtube_object.length > 10 else youtube_object.length,
+                )
+                start_time = np.random.randint(youtube_object.length - duration)
+                finish_time = start_time + duration
+                fps = np.random.randint(low=1, high=30)
 
-        for caption_item in youtube_object.captions:
-            video_dict["captions"][f"{caption_item.code}"] = caption_item.xml_captions
+                output_video_path = (
+                    f"{target_directory}/{url_idx}/{start_time}_{finish_time}.mp4"
+                )
 
-        if (
-            video_dict["age_restricted"]
-            or "en" not in video_dict["captions"]
-            and "a.en" not in video_dict["captions"]
-        ):
-            return url_idx, False, length
-        video = youtube_object.streams.get_highest_resolution()
-        video.download(
-            output_path=f"{target_directory}/{url_idx}/", filename="full_video"
-        )
+                output_audio_path = (
+                    f"{target_directory}/{url_idx}/{start_time}_{finish_time}.aac"
+                )
 
-        input_video_path = f"{target_directory}/{url_idx}/full_video.mp4"
+                new = video.subclip(start_time, finish_time)
+                new.write_videofile(
+                    filename=output_video_path,
+                    fps=fps,
+                    codec="libx264",
+                    bitrate=None,
+                    audio=True,
+                    audio_fps=44100,
+                    preset="medium",
+                    audio_nbytes=4,
+                    audio_codec="aac",
+                    audio_bitrate=None,
+                    audio_bufsize=2000,
+                    temp_audiofile=output_audio_path,
+                    rewrite_audio=True,
+                    remove_temp=False,
+                    write_logfile=False,
+                    verbose=False,
+                    threads=mp.cpu_count(),
+                    ffmpeg_params=None,
+                    logger=None,
+                )
 
-        try:
-            with VideoFileClip(input_video_path) as video:
-                for _ in range(3):
-                    duration = np.random.randint(
-                        low=1,
-                        high=10 if youtube_object.length > 10 else youtube_object.length,
-                    )
-                    start_time = np.random.randint(youtube_object.length - duration)
-                    finish_time = start_time + duration
-                    fps = np.random.randint(low=1, high=30)
-
-                    output_video_path = (
-                        f"{target_directory}/{url_idx}/{start_time}_{finish_time}.mp4"
-                    )
-
-                    output_audio_path = (
-                        f"{target_directory}/{url_idx}/{start_time}_{finish_time}.aac"
-                    )
-
-                    new = video.subclip(start_time, finish_time)
-                    new.write_videofile(
-                        filename=output_video_path,
-                        fps=fps,
-                        codec="libx264",
-                        bitrate=None,
-                        audio=True,
-                        audio_fps=44100,
-                        preset="medium",
-                        audio_nbytes=4,
-                        audio_codec="aac",
-                        audio_bitrate=None,
-                        audio_bufsize=2000,
-                        temp_audiofile=output_audio_path,
-                        rewrite_audio=True,
-                        remove_temp=False,
-                        write_logfile=False,
-                        verbose=True,
-                        threads=mp.cpu_count(),
-                        ffmpeg_params=None,
-                        logger="bar",
-                    )
             os.remove(input_video_path)
-        except:
-            os.remove(input_video_path)
-
-        save_dict_in_json(
-            filepath=f"{target_directory}/{url_idx}/meta_data",
-            metrics_dict=video_dict,
-            overwrite=True,
-        )
-
-        return url_idx, True, length
     except:
-        # print(f"URL {video_url} could not be downloaded")
-        return url_idx, False, length
+        return url_idx, length, False
+
+    return url_idx, length, True
 
 
 def download_length(video_url_idx):
@@ -134,31 +129,11 @@ def download_length(video_url_idx):
     :return: True is successful and False if not
     """
     # init an HTML Session
-    url = f"https://www.youtube.com/watch?v={video_url_idx}"
     try:
+        url = f"https://www.youtube.com/watch?v={video_url_idx}"
         youtube_object = pytube.YouTube(url)
-        video_dict = {
-            "captions": {},
-            "age_restricted": youtube_object.age_restricted,
-            "check_availability": youtube_object.check_availability(),
-            "title": youtube_object.title,
-            "rating": youtube_object.rating,
-            "length": youtube_object.length,
-            "views": youtube_object.views,
-            "author": youtube_object.author,
-            "meta_data": youtube_object.metadata.raw_metadata,
-        }
-
-        for caption_item in youtube_object.captions:
-            video_dict["captions"][f"{caption_item.code}"] = caption_item.xml_captions
-
-        if not video_dict["age_restricted"] and (
-            "en" in video_dict["captions"] or "a.en" in video_dict["captions"]
-        ):
-
-            return video_url_idx, youtube_object.length
-        else:
-            return video_url_idx, 0
+        length = youtube_object.length
+        return video_url_idx, length
     except:
         return video_url_idx, 0
 
@@ -267,17 +242,16 @@ def parallel_download_video_and_meta_data(
         del url_ids_to_length_dict[finished_url]
 
     values = list(url_ids_to_length_dict.values())
-    total_length_to_download = np.sum([values[i] for i in range(max_urls)])
+    total_length_to_download = np.sum(values)
 
     arg_dicts = [
         dict(url_idx=url_idx, length=length, target_directory=target_directory)
         for url_idx, length in url_ids_to_length_dict.items()
     ]
-    with tqdm.tqdm(total=total_length_to_download) as pbar:
-        with concurrent.futures.ProcessPoolExecutor(
-            max_workers=mp.cpu_count()
-        ) as executor:
-            for updates, (url_idx, result, length) in enumerate(
+
+    with concurrent.futures.ProcessPoolExecutor(max_workers=mp.cpu_count()) as executor:
+        with tqdm.tqdm(total=total_length_to_download, smoothing=0.0) as pbar:
+            for video_idx, (url_idx, length, result) in enumerate(
                 executor.map(download_video_and_meta_data_wrapper, arg_dicts), start=1
             ):
                 pbar.update(length)
@@ -285,7 +259,7 @@ def parallel_download_video_and_meta_data(
                     f'Done processing the "{url_idx}: {length} -> {result}" query'
                 )
                 url_idx_to_status_dict[url_idx] = result
-                if updates % 10 == 0:
+                if video_idx % 1 == 0:
                     save_dict_in_json(
                         metrics_dict=url_idx_to_status_dict,
                         filepath=url_to_status_dict_json_filepath,
@@ -308,7 +282,7 @@ def parallel_search_return_url_dict(
         for search_query in search_queries
     ]
 
-    with tqdm.tqdm(total=len(arg_dicts)) as pbar:
+    with tqdm.tqdm(total=len(arg_dicts), smoothing=0.0) as pbar:
         with concurrent.futures.ProcessPoolExecutor(
             max_workers=mp.cpu_count()
         ) as executor:
@@ -328,7 +302,7 @@ def parallel_search_return_url_dict(
 
 def parallel_extract_length_from_url(url_ids):
     url_idx_to_length_dict = {}
-    with tqdm.tqdm(total=len(url_ids)) as pbar:
+    with tqdm.tqdm(total=len(url_ids), smoothing=0.0) as pbar:
         with concurrent.futures.ProcessPoolExecutor(
             max_workers=mp.cpu_count()
         ) as executor:
@@ -357,6 +331,10 @@ def download_dataset_given_txt_file(
         f"{dataset_directory}/query_to_url_idx.json"
     )
 
+    url_to_length_json_filepath = pathlib.Path(
+        f"{dataset_directory}/url_to_length.json"
+    )
+
     url_to_status_dict_json_filepath = pathlib.Path(
         f"{dataset_directory}/url_to_status.json"
     )
@@ -379,8 +357,18 @@ def download_dataset_given_txt_file(
             overwrite=True,
         )
 
-    urls = [url for urls in query_to_url_dict.values() for url in urls]
-    url_idx_to_length = parallel_extract_length_from_url(url_ids=urls)
+    if url_to_length_json_filepath.exists():
+        url_idx_to_length = load_dict_from_json(filepath=url_to_length_json_filepath)
+    else:
+        urls_extended = [url for urls in query_to_url_dict.values() for url in urls]
+        url_idx_to_length = parallel_extract_length_from_url(url_ids=urls_extended)
+
+        save_dict_in_json(
+            metrics_dict=url_idx_to_length,
+            filepath=url_to_length_json_filepath,
+            overwrite=True,
+        )
+
     parallel_download_video_and_meta_data(
         url_ids_to_length_dict=url_idx_to_length,
         target_directory=pathlib.Path(f"{dataset_directory}/"),
@@ -390,29 +378,19 @@ def download_dataset_given_txt_file(
     )
 
 
-# txt_file = pathlib.Path("wikihow_queries/all_train.txt")
+
+
+# txt_file = pathlib.Path("wikihow_queries/all_debug.txt")
 #
-# dataset_directory = pathlib.Path("dataset/train")
+# dataset_directory = pathlib.Path("dataset/debug")
 # dataset_directory.mkdir(parents=True, exist_ok=True)
 #
 # download_dataset_given_txt_file(
 #     txt_filepath=txt_file,
 #     seed=23069,
-#     total_results_per_query=3,
+#     total_results_per_query=1,
 #     dataset_directory=str(dataset_directory),
 # )
-
-txt_file = pathlib.Path("wikihow_queries/all_val.txt")
-
-dataset_directory = pathlib.Path("dataset/val")
-dataset_directory.mkdir(parents=True, exist_ok=True)
-
-download_dataset_given_txt_file(
-    txt_filepath=txt_file,
-    seed=23069,
-    total_results_per_query=3,
-    dataset_directory=str(dataset_directory),
-)
 
 txt_file = pathlib.Path("wikihow_queries/all_test.txt")
 
@@ -426,6 +404,29 @@ download_dataset_given_txt_file(
     dataset_directory=str(dataset_directory),
 )
 
+txt_file = pathlib.Path("wikihow_queries/all_val.txt")
+
+dataset_directory = pathlib.Path("dataset/val")
+dataset_directory.mkdir(parents=True, exist_ok=True)
+
+download_dataset_given_txt_file(
+    txt_filepath=txt_file,
+    seed=23069,
+    total_results_per_query=3,
+    dataset_directory=str(dataset_directory),
+)
+
+txt_file = pathlib.Path("wikihow_queries/all_train.txt")
+
+dataset_directory = pathlib.Path("dataset/train")
+dataset_directory.mkdir(parents=True, exist_ok=True)
+
+download_dataset_given_txt_file(
+    txt_filepath=txt_file,
+    seed=23069,
+    total_results_per_query=3,
+    dataset_directory=str(dataset_directory),
+)
 
 # parallel_search_and_download_given_query_txt(
 #     txt_filepath="wikihow_queries/all_train.txt",
