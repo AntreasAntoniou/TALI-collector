@@ -37,43 +37,58 @@ def download_video_and_meta_data(url_idx, length, target_directory):
     :return: True is succesful and False if not
     """
     # init an HTML Session
-    video_url = f"https://www.youtube.com/watch?v={url_idx}"
-
-    youtube_object = pytube.YouTube(video_url)
-    video_dict = {
-        "captions": {},
-        "age_restricted": youtube_object.age_restricted,
-        "check_availability": youtube_object.check_availability(),
-        "title": youtube_object.title,
-        "rating": youtube_object.rating,
-        "length": youtube_object.length,
-        "views": youtube_object.views,
-        "author": youtube_object.author,
-        "meta_data": youtube_object.metadata.raw_metadata,
-    }
-
-    for caption_item in youtube_object.captions:
-        video_dict["captions"][f"{caption_item.code}"] = caption_item.xml_captions
-
-    if (
-        video_dict["age_restricted"]
-        or "en" not in video_dict["captions"]
-        and "a.en" not in video_dict["captions"]
-    ):
-        return url_idx, length, True
-
-    video = youtube_object.streams.get_highest_resolution()
-    video.download(output_path=f"{target_directory}/{url_idx}/", filename="full_video")
-
-    input_video_path = f"{target_directory}/{url_idx}/full_video.mp4"
-
-    save_dict_in_json(
-        filepath=f"{target_directory}/{url_idx}/meta_data",
-        metrics_dict=video_dict,
-        overwrite=True,
-    )
     try:
-        with VideoFileClip(input_video_path) as video:
+        video_url = f"https://www.youtube.com/watch?v={url_idx}"
+        video_store_filepath = os.path.abspath(f"{target_directory}/{url_idx}")
+        video_store_filepath_object = pathlib.Path(video_store_filepath)
+
+        video_store_filepath_object.mkdir(parents=True, exist_ok=True)
+
+        youtube_object = pytube.YouTube(video_url)
+        video_dict = {
+            "captions": {},
+            "age_restricted": youtube_object.age_restricted,
+            "check_availability": youtube_object.check_availability(),
+            "title": youtube_object.title,
+            "rating": youtube_object.rating,
+            "length": youtube_object.length,
+            "views": youtube_object.views,
+            "author": youtube_object.author,
+            "meta_data": youtube_object.metadata.raw_metadata,
+        }
+
+        for caption_item in youtube_object.captions:
+            video_dict["captions"][f"{caption_item.code}"] = caption_item.xml_captions
+
+        if (
+            video_dict["age_restricted"]
+            or "en" not in video_dict["captions"]
+            and "a.en" not in video_dict["captions"]
+        ):
+            return url_idx, length, True
+
+        save_dict_in_json(
+            filepath=f"{video_store_filepath}/meta_data",
+            metrics_dict=video_dict,
+            overwrite=True,
+        )
+
+        video_low_def = youtube_object.streams.get_by_resolution(resolution="360p")
+
+        if video_low_def is None:
+            print("Can't find low def version of", url_idx, youtube_object.streams)
+        else:
+            video_low_def.download(
+                output_path=f"{video_store_filepath}/",
+                filename="full_video_360p.mp4",
+                max_retries=3,
+            )
+
+
+        input_video_low_def_path = f"{video_store_filepath}/full_video_360p.mp4"
+
+
+        with VideoFileClip(input_video_low_def_path) as video_low_def:
             for _ in range(3):
                 duration = np.random.randint(
                     low=1,
@@ -83,17 +98,17 @@ def download_video_and_meta_data(url_idx, length, target_directory):
                 finish_time = start_time + duration
                 fps = np.random.randint(low=1, high=30)
 
-                output_video_path = (
-                    f"{target_directory}/{url_idx}/{start_time}_{finish_time}.mp4"
+                output_video_low_def_path = (
+                    f"{video_store_filepath}/{start_time}" f"_{finish_time}_low_def.mp4"
                 )
 
-                output_audio_path = (
-                    f"{target_directory}/{url_idx}/{start_time}_{finish_time}.aac"
+                output_audio_low_def_path = (
+                    f"{video_store_filepath}/{start_time}" f"_{finish_time}_low_def.mp3"
                 )
 
-                new = video.subclip(start_time, finish_time)
-                new.write_videofile(
-                    filename=output_video_path,
+                new_low_def = video_low_def.subclip(start_time, finish_time)
+                new_low_def.write_videofile(
+                    filename=output_video_low_def_path,
                     fps=fps,
                     codec="libx264",
                     bitrate=None,
@@ -101,10 +116,10 @@ def download_video_and_meta_data(url_idx, length, target_directory):
                     audio_fps=44100,
                     preset="medium",
                     audio_nbytes=4,
-                    audio_codec="aac",
+                    audio_codec="mp3",
                     audio_bitrate=None,
                     audio_bufsize=2000,
-                    temp_audiofile=output_audio_path,
+                    temp_audiofile=output_audio_low_def_path,
                     rewrite_audio=True,
                     remove_temp=False,
                     write_logfile=False,
@@ -114,8 +129,22 @@ def download_video_and_meta_data(url_idx, length, target_directory):
                     logger=None,
                 )
 
-            os.remove(input_video_path)
-    except:
+            os.remove(input_video_low_def_path)
+
+    except Exception as e:
+
+        # Just print(e) is cleaner and more likely what you want,
+
+        # but if you insist on printing message specifically whenever possible...
+
+        if hasattr(e, "message"):
+
+            print(e.message)
+
+        else:
+
+            print(e)
+
         return url_idx, length, False
 
     return url_idx, length, True
@@ -378,19 +407,17 @@ def download_dataset_given_txt_file(
     )
 
 
+txt_file = pathlib.Path("wikihow_queries/all_debug.txt")
 
+dataset_directory = pathlib.Path("dataset/debug")
+dataset_directory.mkdir(parents=True, exist_ok=True)
 
-# txt_file = pathlib.Path("wikihow_queries/all_debug.txt")
-#
-# dataset_directory = pathlib.Path("dataset/debug")
-# dataset_directory.mkdir(parents=True, exist_ok=True)
-#
-# download_dataset_given_txt_file(
-#     txt_filepath=txt_file,
-#     seed=23069,
-#     total_results_per_query=1,
-#     dataset_directory=str(dataset_directory),
-# )
+download_dataset_given_txt_file(
+    txt_filepath=txt_file,
+    seed=23069,
+    total_results_per_query=20,
+    dataset_directory=str(dataset_directory),
+)
 
 txt_file = pathlib.Path("wikihow_queries/all_test.txt")
 
