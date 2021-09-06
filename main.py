@@ -1,4 +1,5 @@
 import string
+import time
 
 import urllib.request
 import pytube
@@ -13,6 +14,7 @@ import pathlib
 from moviepy.video.io.VideoFileClip import VideoFileClip
 import os
 
+num_threads = 8
 # 1. store everything in a folder, separate languages -> done
 # 2. save both top N relevance and top N views -> done
 # 3. write parallelized code for the download -> done
@@ -37,6 +39,7 @@ def download_video_and_meta_data(url_idx, length, target_directory):
     :return: True is succesful and False if not
     """
     # init an HTML Session
+    input_video_low_def_path = None
     try:
         video_url = f"https://www.youtube.com/watch?v={url_idx}"
         video_store_filepath = os.path.abspath(f"{target_directory}/{url_idx}")
@@ -81,55 +84,67 @@ def download_video_and_meta_data(url_idx, length, target_directory):
             video_low_def.download(
                 output_path=f"{video_store_filepath}/",
                 filename="full_video_360p.mp4",
-                max_retries=3,
+                max_retries=1,
             )
+
+            time.sleep(1)
 
 
         input_video_low_def_path = f"{video_store_filepath}/full_video_360p.mp4"
 
-
+        clip_count = 0
         with VideoFileClip(input_video_low_def_path) as video_low_def:
-            for _ in range(3):
-                duration = np.random.randint(
-                    low=1,
-                    high=10 if youtube_object.length > 10 else youtube_object.length,
-                )
-                start_time = np.random.randint(youtube_object.length - duration)
-                finish_time = start_time + duration
-                fps = np.random.randint(low=1, high=30)
+            while clip_count < 3:
+                try:
+                    duration = np.random.randint(
+                        low=1,
+                        high=10 if youtube_object.length > 10 else youtube_object.length,
+                    )
+                    start_time = np.random.randint(youtube_object.length - duration)
+                    finish_time = start_time + duration
+                    fps = np.random.randint(low=1, high=30)
 
-                output_video_low_def_path = (
-                    f"{video_store_filepath}/{start_time}" f"_{finish_time}_low_def.mp4"
-                )
+                    output_video_low_def_path = (
+                        f"{video_store_filepath}/{start_time}" f"_{finish_time}_low_def.mp4"
+                    )
 
-                output_audio_low_def_path = (
-                    f"{video_store_filepath}/{start_time}" f"_{finish_time}_low_def.mp3"
-                )
+                    output_audio_low_def_path = (
+                        f"{video_store_filepath}/{start_time}" f"_{finish_time}_low_def.mp3"
+                    )
 
-                new_low_def = video_low_def.subclip(start_time, finish_time)
-                new_low_def.write_videofile(
-                    filename=output_video_low_def_path,
-                    fps=fps,
-                    codec="libx264",
-                    bitrate=None,
-                    audio=True,
-                    audio_fps=44100,
-                    preset="medium",
-                    audio_nbytes=4,
-                    audio_codec="mp3",
-                    audio_bitrate=None,
-                    audio_bufsize=2000,
-                    temp_audiofile=output_audio_low_def_path,
-                    rewrite_audio=True,
-                    remove_temp=False,
-                    write_logfile=False,
-                    verbose=False,
-                    threads=mp.cpu_count(),
-                    ffmpeg_params=None,
-                    logger=None,
-                )
+                    new_low_def = video_low_def.subclip(start_time, finish_time)
+                    new_low_def.write_videofile(
+                        filename=output_video_low_def_path,
+                        fps=fps,
+                        codec="libx264",
+                        bitrate=None,
+                        audio=True,
+                        audio_fps=44100,
+                        preset="medium",
+                        audio_nbytes=4,
+                        audio_codec="mp3",
+                        audio_bitrate=None,
+                        audio_bufsize=2000,
+                        temp_audiofile=output_audio_low_def_path,
+                        rewrite_audio=True,
+                        remove_temp=False,
+                        write_logfile=False,
+                        verbose=False,
+                        threads=num_threads,
+                        ffmpeg_params=None,
+                        logger=None,
+                    )
 
-            os.remove(input_video_low_def_path)
+                    clip_count += 1
+
+                except Exception as inner_exception:
+                    if hasattr(inner_exception, "message"):
+
+                        print(inner_exception.message)
+
+                    else:
+
+                        print(inner_exception)
 
     except Exception as e:
 
@@ -144,6 +159,10 @@ def download_video_and_meta_data(url_idx, length, target_directory):
         else:
 
             print(e)
+
+        if input_video_low_def_path is not None:
+
+            os.remove(input_video_low_def_path)
 
         return url_idx, length, False
 
@@ -230,6 +249,7 @@ def search_and_return_url(search_query, total_results_per_query):
             terms=search_query, sort_type=sort_type, n=total_results_per_query
         )
         url_list.extend(url_idxs)
+        
 
     return search_query, url_list
 
@@ -278,7 +298,7 @@ def parallel_download_video_and_meta_data(
         for url_idx, length in url_ids_to_length_dict.items()
     ]
 
-    with concurrent.futures.ProcessPoolExecutor(max_workers=mp.cpu_count()) as executor:
+    with concurrent.futures.ProcessPoolExecutor(max_workers=num_threads) as executor:
         with tqdm.tqdm(total=total_length_to_download, smoothing=0.0) as pbar:
             for video_idx, (url_idx, length, result) in enumerate(
                 executor.map(download_video_and_meta_data_wrapper, arg_dicts), start=1
@@ -294,6 +314,7 @@ def parallel_download_video_and_meta_data(
                         filepath=url_to_status_dict_json_filepath,
                         overwrite=True,
                     )
+
 
 
 def parallel_search_return_url_dict(
@@ -313,7 +334,7 @@ def parallel_search_return_url_dict(
 
     with tqdm.tqdm(total=len(arg_dicts), smoothing=0.0) as pbar:
         with concurrent.futures.ProcessPoolExecutor(
-            max_workers=mp.cpu_count()
+            max_workers=num_threads
         ) as executor:
             query_to_url_ids_dict = {}
 
@@ -326,6 +347,7 @@ def parallel_search_return_url_dict(
                 )
                 query_to_url_ids_dict[query_string] = video_url_ids
 
+
     return query_to_url_ids_dict
 
 
@@ -333,7 +355,7 @@ def parallel_extract_length_from_url(url_ids):
     url_idx_to_length_dict = {}
     with tqdm.tqdm(total=len(url_ids), smoothing=0.0) as pbar:
         with concurrent.futures.ProcessPoolExecutor(
-            max_workers=mp.cpu_count()
+            max_workers=num_threads
         ) as executor:
             for video_url_idx, length in executor.map(download_length, url_ids):
                 pbar.update(1)
