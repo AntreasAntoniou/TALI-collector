@@ -59,7 +59,11 @@ def download_video_and_meta_data(url_idx, length, target_directory, num_threads,
     # init an HTML Session
     time.sleep(sleep_duration)
     logging.info(f'Sleeping for {sleep_duration} seconds..')
-    input_video_low_def_path = None
+
+    video_url = f"https://www.youtube.com/watch?v={url_idx}"
+    video_store_filepath = os.path.abspath(f"{target_directory}/{url_idx}")
+    video_store_filepath_object = pathlib.Path(video_store_filepath)
+
     try:
         video_url = f"https://www.youtube.com/watch?v={url_idx}"
         video_store_filepath = os.path.abspath(f"{target_directory}/{url_idx}")
@@ -100,15 +104,35 @@ def download_video_and_meta_data(url_idx, length, target_directory, num_threads,
             resolution=resolution_identifier)
 
         if video_low_def is None:
-            logging.info(f"Can't find low def version of, {url_idx},"
-                         f" {youtube_object.streams}")
+            logging.info(f"Can't find "
+                         f"{resolution_identifier} version of, "
+                         f"{url_idx},"
+                         f"{youtube_object.streams}")
         else:
+            logging.info(f"Download "
+                         f"{resolution_identifier} version of, "
+                         f"{url_idx},"
+                         f"{video_store_filepath}/"
+                         f"full_video_{resolution_identifier}.mp4")
+
             video_low_def.download(
                 output_path=f"{video_store_filepath}/",
                 filename=f"full_video_{resolution_identifier}.mp4",
                 max_retries=1,
             )
+    except Exception:
 
+        # Just print(e) is cleaner and more likely what you want,
+
+        # but if you insist on printing message specifically whenever possible...
+
+        logging.exception(f'Video {video_url}, {video_store_filepath_object} has gone boom, '
+                          f'will now delete this file')
+
+        # if input_video_low_def_path is not None:
+        #     os.remove(input_video_low_def_path)
+
+        return url_idx, length, False
         # input_video_low_def_path = f"{video_store_filepath}/" \
         #                            f"full_video_{resolution_identifier}.mp4"
         #
@@ -153,19 +177,7 @@ def download_video_and_meta_data(url_idx, length, target_directory, num_threads,
         #
         #     except Exception:
         #         logging.exception('Gone boom 😼')
-    except Exception:
 
-        # Just print(e) is cleaner and more likely what you want,
-
-        # but if you insist on printing message specifically whenever possible...
-
-        logging.exception(f'Video {input_video_low_def_path} has gone boom, '
-                          f'will now delete this file')
-
-        if input_video_low_def_path is not None:
-            os.remove(input_video_low_def_path)
-
-        return url_idx, length, False
 
     return url_idx, length, True
 
