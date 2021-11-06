@@ -89,7 +89,6 @@ def download_video_and_meta_data(url_idx, length, target_directory):
 
             time.sleep(1)
 
-
         input_video_low_def_path = f"{video_store_filepath}/full_video_360p.mp4"
 
         clip_count = 0
@@ -98,18 +97,22 @@ def download_video_and_meta_data(url_idx, length, target_directory):
                 try:
                     duration = np.random.randint(
                         low=1,
-                        high=10 if youtube_object.length > 10 else youtube_object.length,
+                        high=10
+                        if youtube_object.length > 10
+                        else youtube_object.length,
                     )
                     start_time = np.random.randint(youtube_object.length - duration)
                     finish_time = start_time + duration
                     fps = np.random.randint(low=1, high=30)
 
                     output_video_low_def_path = (
-                        f"{video_store_filepath}/{start_time}" f"_{finish_time}_low_def.mp4"
+                        f"{video_store_filepath}/{start_time}"
+                        f"_{finish_time}_low_def.mp4"
                     )
 
                     output_audio_low_def_path = (
-                        f"{video_store_filepath}/{start_time}" f"_{finish_time}_low_def.mp3"
+                        f"{video_store_filepath}/{start_time}"
+                        f"_{finish_time}_low_def.mp3"
                     )
 
                     new_low_def = video_low_def.subclip(start_time, finish_time)
@@ -249,7 +252,6 @@ def search_and_return_url(search_query, total_results_per_query):
             terms=search_query, sort_type=sort_type, n=total_results_per_query
         )
         url_list.extend(url_idxs)
-        
 
     return search_query, url_list
 
@@ -316,7 +318,6 @@ def parallel_download_video_and_meta_data(
                     )
 
 
-
 def parallel_search_return_url_dict(
     search_queries, seed, total_results_per_query=3, max_queries=-1
 ):
@@ -346,7 +347,6 @@ def parallel_search_return_url_dict(
                     f'Done processing the "{query_string} ->' f' {video_url_ids}" query'
                 )
                 query_to_url_ids_dict[query_string] = video_url_ids
-
 
     return query_to_url_ids_dict
 
