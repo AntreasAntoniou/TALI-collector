@@ -109,50 +109,50 @@ def download_video_and_meta_data(url_idx, length, target_directory, num_threads,
 
             time.sleep(1)
 
-        input_video_low_def_path = f"{video_store_filepath}/" \
-                                   f"full_video_{resolution_identifier}.mp4"
-
-        clip_count = 0
-        with VideoFileClip(input_video_low_def_path) as video_low_def:
-            try:
-                output_video_low_def_path = (
-                    f"{video_store_filepath}/video.mp4"
-                )
-
-                output_audio_low_def_path = (
-                    f"{video_store_filepath}/audio.mp3"
-                )
-
-                video_low_def.write_videofile(
-                    filename=output_video_low_def_path,
-                    fps=30,
-                    codec="libx264",
-                    bitrate=None,
-                    audio=True,
-                    audio_fps=44100,
-                    preset="medium",
-                    audio_nbytes=4,
-                    audio_codec="mp3",
-                    audio_bitrate=None,
-                    audio_bufsize=2000,
-                    temp_audiofile=output_audio_low_def_path,
-                    rewrite_audio=True,
-                    remove_temp=False,
-                    write_logfile=False,
-                    verbose=False,
-                    threads=num_threads,
-                    ffmpeg_params=None,
-                    logger=None,
-                )
-
-                clip_count += 1
-                if os.path.exists(f"{video_store_filepath}/"
-                                  f"full_video_{resolution_identifier}.mp4"):
-                    os.remove(f"{video_store_filepath}/"
-                              f"full_video_{resolution_identifier}.mp4")
-
-            except Exception:
-                logging.exception('Gone boom 😼')
+        # input_video_low_def_path = f"{video_store_filepath}/" \
+        #                            f"full_video_{resolution_identifier}.mp4"
+        #
+        # clip_count = 0
+        # with VideoFileClip(input_video_low_def_path) as video_low_def:
+        #     try:
+        #         output_video_low_def_path = (
+        #             f"{video_store_filepath}/video.mp4"
+        #         )
+        #
+        #         output_audio_low_def_path = (
+        #             f"{video_store_filepath}/audio.mp3"
+        #         )
+        #
+        #         video_low_def.write_videofile(
+        #             filename=output_video_low_def_path,
+        #             fps=30,
+        #             codec="libx264",
+        #             bitrate=None,
+        #             audio=True,
+        #             audio_fps=44100,
+        #             preset="medium",
+        #             audio_nbytes=4,
+        #             audio_codec="mp3",
+        #             audio_bitrate=None,
+        #             audio_bufsize=2000,
+        #             temp_audiofile=output_audio_low_def_path,
+        #             rewrite_audio=True,
+        #             remove_temp=False,
+        #             write_logfile=False,
+        #             verbose=False,
+        #             threads=num_threads,
+        #             ffmpeg_params=None,
+        #             logger=None,
+        #         )
+        #
+        #         clip_count += 1
+        #         if os.path.exists(f"{video_store_filepath}/"
+        #                           f"full_video_{resolution_identifier}.mp4"):
+        #             os.remove(f"{video_store_filepath}/"
+        #                       f"full_video_{resolution_identifier}.mp4")
+        #
+        #     except Exception:
+        #         logging.exception('Gone boom 😼')
     except Exception:
 
         # Just print(e) is cleaner and more likely what you want,
