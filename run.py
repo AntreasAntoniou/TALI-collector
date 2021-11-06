@@ -213,10 +213,11 @@ def search_for_terms(terms, sort_type="relevance", n=3):
     """
     sort_key_to_code = {"relevance": "CAASAjAB", "view-counts": "CAMSAjAB"}
     try:
+        url = f"https://www.youtube.com/results?search_query={terms}"
+        f"&sp={sort_key_to_code[sort_type]}"
+            # .encode('utf-8').strip()
         html = urllib.request.urlopen(
-            f"https://www.youtube.com/results?search_query="
-            f"{terms}"
-            f"&sp={sort_key_to_code[sort_type]}"
+            url
         )
 
         html = html.read().decode()
