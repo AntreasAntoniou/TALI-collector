@@ -32,6 +32,7 @@ def get_base_argument_parser():
     parser.add_argument("--seed", type=int, default=23061991)
     parser.add_argument("--total_results_per_query", type=int, default=3)
     parser.add_argument("--target_dataset_dir", type=str, default='dataset/')
+    parser.add_argument("--resolution_identifier", type=str, default='480p')
 
     # parser.add_argument("--rescan_dataset_files", default=False, action="store_true")
     parser = parser.parse_args()
@@ -43,9 +44,11 @@ def download_video_and_meta_data_wrapper(arg_dict):
     return download_video_and_meta_data(**arg_dict)
 
 
-def download_video_and_meta_data(url_idx, length, target_directory, num_threads):
+def download_video_and_meta_data(url_idx, length, target_directory, num_threads,
+                                 resolution_identifier):
     """
     Downloads a youtube video and its meta data.
+    :param resolution_identifier:
     :param num_threads:
     :param url_idx:
     :param length:
@@ -91,7 +94,8 @@ def download_video_and_meta_data(url_idx, length, target_directory, num_threads)
             overwrite=True,
         )
 
-        video_low_def = youtube_object.streams.get_by_resolution(resolution="480p")
+        video_low_def = youtube_object.streams.get_by_resolution(
+            resolution=resolution_identifier)
 
         if video_low_def is None:
             logging.info(f"Can't find low def version of, {url_idx},"
@@ -99,13 +103,14 @@ def download_video_and_meta_data(url_idx, length, target_directory, num_threads)
         else:
             video_low_def.download(
                 output_path=f"{video_store_filepath}/",
-                filename="full_video_360p.mp4",
+                filename=f"full_video_{resolution_identifier}.mp4",
                 max_retries=1,
             )
 
             time.sleep(1)
 
-        input_video_low_def_path = f"{video_store_filepath}/full_video_360p.mp4"
+        input_video_low_def_path = f"{video_store_filepath}/" \
+                                   f"full_video_{resolution_identifier}.mp4"
 
         clip_count = 0
         with VideoFileClip(input_video_low_def_path) as video_low_def:
@@ -141,8 +146,10 @@ def download_video_and_meta_data(url_idx, length, target_directory, num_threads)
                 )
 
                 clip_count += 1
-                if os.path.exists(f"{video_store_filepath}/full_video_360p.mp4"):
-                    os.remove(f"{video_store_filepath}/full_video_360p.mp4")
+                if os.path.exists(f"{video_store_filepath}/"
+                                  f"full_video_{resolution_identifier}.mp4"):
+                    os.remove(f"{video_store_filepath}/"
+                              f"full_video_{resolution_identifier}.mp4")
 
             except Exception:
                 logging.exception('Gone boom 😼')
@@ -257,6 +264,7 @@ def parallel_download_video_and_meta_data(
         target_directory,
         url_to_status_dict_json_filepath,
         num_threads,
+        resolution_identifier,
         max_urls=-1,
 ):
     np.random.seed(seed)
@@ -289,7 +297,7 @@ def parallel_download_video_and_meta_data(
 
     arg_dicts = [
         dict(url_idx=url_idx, length=length, target_directory=target_directory,
-             num_threads=num_threads)
+             num_threads=num_threads, resolution_identifier=resolution_identifier)
         for url_idx, length in url_ids_to_length_dict.items()
     ]
 
@@ -368,6 +376,7 @@ def download_dataset_given_txt_file(
         seed,
         total_results_per_query,
         num_threads,
+        resolution_identifier,
         max_queries=-1,
         max_downloads_in_set=-1,
 ):
@@ -421,7 +430,8 @@ def download_dataset_given_txt_file(
         target_directory=pathlib.Path(f"{dataset_directory}/"),
         url_to_status_dict_json_filepath=url_to_status_dict_json_filepath,
         max_urls=max_downloads_in_set,
-        seed=seed, num_threads=num_threads
+        seed=seed, num_threads=num_threads,
+        resolution_identifier=resolution_identifier
     )
 
 
@@ -438,5 +448,6 @@ if __name__ == "__main__":
             seed=args.seed,
             total_results_per_query=args.total_results_per_query,
             dataset_directory=str(dataset_directory),
-            num_threads=args.num_threads
+            num_threads=args.num_threads,
+            resolution_identifier=args.resolution_identifier
         )
