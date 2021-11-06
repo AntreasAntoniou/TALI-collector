@@ -91,7 +91,7 @@ def download_video_and_meta_data(url_idx, length, target_directory, num_threads)
             overwrite=True,
         )
 
-        video_low_def = youtube_object.streams.get_by_resolution(resolution="360p")
+        video_low_def = youtube_object.streams.get_by_resolution(resolution="480p")
 
         if video_low_def is None:
             logging.info(f"Can't find low def version of, {url_idx},"
