@@ -1,37 +1,52 @@
+import argparse
+import concurrent.futures
+import logging
+import multiprocessing as mp
+import os
+import pathlib
+import re
 import string
 import time
-
 import urllib.request
-import pytube
-from rich import print
-from storage import save_dict_in_json, load_dict_from_json
-import re
-import tqdm
-import concurrent.futures
-import numpy as np
-import multiprocessing as mp
-import pathlib
-from moviepy.video.io.VideoFileClip import VideoFileClip
-import os
 
-num_threads = 8
-# 1. store everything in a folder, separate languages -> done
-# 2. save both top N relevance and top N views -> done
-# 3. write parallelized code for the download -> done
-# 4. randomize query selection -> done
-# 5. ensure numbers are removed from queries -> done
-# 6. decide on how to restrict the data. Time? Number of videos? -> done
-# 7. Collect a nice json of queries to video links + length
-# 8. Use length to time tqdm progress
-# 9. Write code that samples N points from a video and use 1-30 frames per point
-# 10. Count frames to make sure we don't over run
+import numpy as np
+import pytube
+import tqdm
+from moviepy.video.io.VideoFileClip import VideoFileClip
+from rich.logging import RichHandler
+
+from storage import load_dict_from_json, save_dict_in_json
+
+FORMAT = "%(message)s"
+logging.basicConfig(
+    level=logging.INFO, format=FORMAT, datefmt="[%X]", handlers=[RichHandler()]
+)
+
+logging = logging.getLogger("rich")
+
+
+def get_base_argument_parser():
+    parser = argparse.ArgumentParser()
+
+    parser.add_argument("--num_threads", type=int, default=8)
+    parser.add_argument("--seed", type=int, default=23061991)
+    parser.add_argument("--total_results_per_query", type=int, default=3)
+    parser.add_argument("--target_dataset_dir", type=str, default='dataset/')
+
+    # parser.add_argument("--rescan_dataset_files", default=False, action="store_true")
+    parser = parser.parse_args()
+
+    return parser
+
+
 def download_video_and_meta_data_wrapper(arg_dict):
     return download_video_and_meta_data(**arg_dict)
 
 
-def download_video_and_meta_data(url_idx, length, target_directory):
+def download_video_and_meta_data(url_idx, length, target_directory, num_threads):
     """
     Downloads a youtube video and its meta data.
+    :param num_threads:
     :param url_idx:
     :param length:
     :return:
@@ -64,9 +79,9 @@ def download_video_and_meta_data(url_idx, length, target_directory):
             video_dict["captions"][f"{caption_item.code}"] = caption_item.xml_captions
 
         if (
-            video_dict["age_restricted"]
-            or "en" not in video_dict["captions"]
-            and "a.en" not in video_dict["captions"]
+                video_dict["age_restricted"]
+                or "en" not in video_dict["captions"]
+                and "a.en" not in video_dict["captions"]
         ):
             return url_idx, length, True
 
@@ -79,7 +94,8 @@ def download_video_and_meta_data(url_idx, length, target_directory):
         video_low_def = youtube_object.streams.get_by_resolution(resolution="360p")
 
         if video_low_def is None:
-            print("Can't find low def version of", url_idx, youtube_object.streams)
+            logging.info(f"Can't find low def version of, {url_idx},"
+                         f" {youtube_object.streams}")
         else:
             video_low_def.download(
                 output_path=f"{video_store_filepath}/",
@@ -93,78 +109,53 @@ def download_video_and_meta_data(url_idx, length, target_directory):
 
         clip_count = 0
         with VideoFileClip(input_video_low_def_path) as video_low_def:
-            while clip_count < 3:
-                try:
-                    duration = np.random.randint(
-                        low=1,
-                        high=10
-                        if youtube_object.length > 10
-                        else youtube_object.length,
-                    )
-                    start_time = np.random.randint(youtube_object.length - duration)
-                    finish_time = start_time + duration
-                    fps = np.random.randint(low=1, high=30)
+            try:
+                output_video_low_def_path = (
+                    f"{video_store_filepath}/video.mp4"
+                )
 
-                    output_video_low_def_path = (
-                        f"{video_store_filepath}/{start_time}"
-                        f"_{finish_time}_low_def.mp4"
-                    )
+                output_audio_low_def_path = (
+                    f"{video_store_filepath}/audio.mp3"
+                )
 
-                    output_audio_low_def_path = (
-                        f"{video_store_filepath}/{start_time}"
-                        f"_{finish_time}_low_def.mp3"
-                    )
+                video_low_def.write_videofile(
+                    filename=output_video_low_def_path,
+                    fps=30,
+                    codec="libx264",
+                    bitrate=None,
+                    audio=True,
+                    audio_fps=44100,
+                    preset="medium",
+                    audio_nbytes=4,
+                    audio_codec="mp3",
+                    audio_bitrate=None,
+                    audio_bufsize=2000,
+                    temp_audiofile=output_audio_low_def_path,
+                    rewrite_audio=True,
+                    remove_temp=False,
+                    write_logfile=False,
+                    verbose=False,
+                    threads=num_threads,
+                    ffmpeg_params=None,
+                    logger=None,
+                )
 
-                    new_low_def = video_low_def.subclip(start_time, finish_time)
-                    new_low_def.write_videofile(
-                        filename=output_video_low_def_path,
-                        fps=fps,
-                        codec="libx264",
-                        bitrate=None,
-                        audio=True,
-                        audio_fps=44100,
-                        preset="medium",
-                        audio_nbytes=4,
-                        audio_codec="mp3",
-                        audio_bitrate=None,
-                        audio_bufsize=2000,
-                        temp_audiofile=output_audio_low_def_path,
-                        rewrite_audio=True,
-                        remove_temp=False,
-                        write_logfile=False,
-                        verbose=False,
-                        threads=num_threads,
-                        ffmpeg_params=None,
-                        logger=None,
-                    )
+                clip_count += 1
+                if os.path.exists(f"{video_store_filepath}/full_video_360p.mp4"):
+                    os.remove(f"{video_store_filepath}/full_video_360p.mp4")
 
-                    clip_count += 1
-
-                except Exception as inner_exception:
-                    if hasattr(inner_exception, "message"):
-
-                        print(inner_exception.message)
-
-                    else:
-
-                        print(inner_exception)
-
-    except Exception as e:
+            except Exception:
+                logging.exception('Gone boom 😼')
+    except Exception:
 
         # Just print(e) is cleaner and more likely what you want,
 
         # but if you insist on printing message specifically whenever possible...
 
-        if hasattr(e, "message"):
-
-            print(e.message)
-
-        else:
-
-            print(e)
+        logging.exception(f'Video {input_video_low_def_path} has gone boom, '
+                          f'will now delete this file')
 
         if input_video_low_def_path is not None:
-
             os.remove(input_video_low_def_path)
 
         return url_idx, length, False
@@ -261,11 +252,12 @@ def search_and_return_url_wrapper(arg_dict):
 
 
 def parallel_download_video_and_meta_data(
-    seed,
-    url_ids_to_length_dict,
-    target_directory,
-    url_to_status_dict_json_filepath,
-    max_urls=-1,
+        seed,
+        url_ids_to_length_dict,
+        target_directory,
+        url_to_status_dict_json_filepath,
+        num_threads,
+        max_urls=-1,
 ):
     np.random.seed(seed)
     idx = np.arange(len(list(url_ids_to_length_dict.keys())))
@@ -296,14 +288,16 @@ def parallel_download_video_and_meta_data(
     total_length_to_download = np.sum(values)
 
     arg_dicts = [
-        dict(url_idx=url_idx, length=length, target_directory=target_directory)
+        dict(url_idx=url_idx, length=length, target_directory=target_directory,
+             num_threads=num_threads)
         for url_idx, length in url_ids_to_length_dict.items()
     ]
 
     with concurrent.futures.ProcessPoolExecutor(max_workers=num_threads) as executor:
         with tqdm.tqdm(total=total_length_to_download, smoothing=0.0) as pbar:
             for video_idx, (url_idx, length, result) in enumerate(
-                executor.map(download_video_and_meta_data_wrapper, arg_dicts), start=1
+                    executor.map(download_video_and_meta_data_wrapper, arg_dicts),
+                    start=1
             ):
                 pbar.update(length)
                 pbar.set_description(
@@ -319,7 +313,7 @@ def parallel_download_video_and_meta_data(
 
 
 def parallel_search_return_url_dict(
-    search_queries, seed, total_results_per_query=3, max_queries=-1
+        search_queries, seed, num_threads, total_results_per_query=3, max_queries=-1
 ):
     np.random.seed(seed)
     idx = np.arange(len(search_queries))
@@ -335,12 +329,12 @@ def parallel_search_return_url_dict(
 
     with tqdm.tqdm(total=len(arg_dicts), smoothing=0.0) as pbar:
         with concurrent.futures.ProcessPoolExecutor(
-            max_workers=num_threads
+                max_workers=num_threads
         ) as executor:
             query_to_url_ids_dict = {}
 
             for query_string, video_url_ids in executor.map(
-                search_and_return_url_wrapper, arg_dicts
+                    search_and_return_url_wrapper, arg_dicts
             ):
                 pbar.update(1)
                 pbar.set_description(
@@ -351,11 +345,11 @@ def parallel_search_return_url_dict(
     return query_to_url_ids_dict
 
 
-def parallel_extract_length_from_url(url_ids):
+def parallel_extract_length_from_url(num_threads, url_ids):
     url_idx_to_length_dict = {}
     with tqdm.tqdm(total=len(url_ids), smoothing=0.0) as pbar:
         with concurrent.futures.ProcessPoolExecutor(
-            max_workers=num_threads
+                max_workers=num_threads
         ) as executor:
             for video_url_idx, length in executor.map(download_length, url_ids):
                 pbar.update(1)
@@ -369,12 +363,13 @@ def parallel_extract_length_from_url(url_ids):
 
 
 def download_dataset_given_txt_file(
-    txt_filepath,
-    dataset_directory,
-    seed,
-    total_results_per_query,
-    max_queries=-1,
-    max_downloads_in_set=-1,
+        txt_filepath,
+        dataset_directory,
+        seed,
+        total_results_per_query,
+        num_threads,
+        max_queries=-1,
+        max_downloads_in_set=-1,
 ):
     search_queries = list(extract_terms_from_txt(filepath=txt_filepath))
 
@@ -399,7 +394,7 @@ def download_dataset_given_txt_file(
             search_queries=search_queries,
             total_results_per_query=total_results_per_query,
             max_queries=max_queries,
-            seed=seed,
+            seed=seed, num_threads=num_threads
         )
 
         save_dict_in_json(
@@ -412,7 +407,8 @@ def download_dataset_given_txt_file(
         url_idx_to_length = load_dict_from_json(filepath=url_to_length_json_filepath)
     else:
         urls_extended = [url for urls in query_to_url_dict.values() for url in urls]
-        url_idx_to_length = parallel_extract_length_from_url(url_ids=urls_extended)
+        url_idx_to_length = parallel_extract_length_from_url(url_ids=urls_extended,
+                                                             num_threads=num_threads)
 
         save_dict_in_json(
             metrics_dict=url_idx_to_length,
@@ -425,74 +421,22 @@ def download_dataset_given_txt_file(
         target_directory=pathlib.Path(f"{dataset_directory}/"),
         url_to_status_dict_json_filepath=url_to_status_dict_json_filepath,
         max_urls=max_downloads_in_set,
-        seed=seed,
+        seed=seed, num_threads=num_threads
     )
 
 
-txt_file = pathlib.Path("wikihow_queries/all_debug.txt")
+if __name__ == "__main__":
+    args = get_base_argument_parser()
+    for set_name in ['debug', 'train', 'val', 'test']:
+        txt_file = pathlib.Path(f"wikihow_queries/all_{set_name}.txt")
 
-dataset_directory = pathlib.Path("dataset/debug")
-dataset_directory.mkdir(parents=True, exist_ok=True)
+        dataset_directory = pathlib.Path(f"{args.target_dataset_dir}/{set_name}")
+        dataset_directory.mkdir(parents=True, exist_ok=True)
 
-download_dataset_given_txt_file(
-    txt_filepath=txt_file,
-    seed=23069,
-    total_results_per_query=20,
-    dataset_directory=str(dataset_directory),
-)
-
-txt_file = pathlib.Path("wikihow_queries/all_test.txt")
-
-dataset_directory = pathlib.Path("dataset/test")
-dataset_directory.mkdir(parents=True, exist_ok=True)
-
-download_dataset_given_txt_file(
-    txt_filepath=txt_file,
-    seed=23069,
-    total_results_per_query=3,
-    dataset_directory=str(dataset_directory),
-)
-
-txt_file = pathlib.Path("wikihow_queries/all_val.txt")
-
-dataset_directory = pathlib.Path("dataset/val")
-dataset_directory.mkdir(parents=True, exist_ok=True)
-
-download_dataset_given_txt_file(
-    txt_filepath=txt_file,
-    seed=23069,
-    total_results_per_query=3,
-    dataset_directory=str(dataset_directory),
-)
-
-txt_file = pathlib.Path("wikihow_queries/all_train.txt")
-
-dataset_directory = pathlib.Path("dataset/train")
-dataset_directory.mkdir(parents=True, exist_ok=True)
-
-download_dataset_given_txt_file(
-    txt_filepath=txt_file,
-    seed=23069,
-    total_results_per_query=3,
-    dataset_directory=str(dataset_directory),
-)
-
-# parallel_search_and_download_given_query_txt(
-#     txt_filepath="wikihow_queries/all_train.txt",
-#     folder_name="train",
-#     total_downloads_per_query=3,
-#     max_queries=12500,
-# )
-#
-#
-# parallel_search_and_download_given_query_txt(
-#     txt_filepath="wikihow_queries/all_val.txt",
-#     folder_name="val",
-#     total_downloads_per_query=3,
-# )
-#
-# parallel_search_and_download_given_query_txt(
-#     txt_filepath="wikihow_queries/all_test.txt",
-#     folder_name="test",
-#     total_downloads_per_query=3,
-# )
+        download_dataset_given_txt_file(
+            txt_filepath=txt_file,
+            seed=args.seed,
+            total_results_per_query=args.total_results_per_query,
+            dataset_directory=str(dataset_directory),
+            num_threads=args.num_threads
+        )
