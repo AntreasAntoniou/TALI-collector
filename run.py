@@ -201,6 +201,7 @@ def download_length(video_url_idx):
         logging.exception(f'Couldn\'t get length for {url}')
         return video_url_idx, 0
 
+from yelp_uri.encoding import recode_uri
 
 def search_for_terms(terms, sort_type="relevance", n=3):
     """
@@ -216,6 +217,7 @@ def search_for_terms(terms, sort_type="relevance", n=3):
         url = f"https://www.youtube.com/results?search_query={terms}"
         f"&sp={sort_key_to_code[sort_type]}"
             # .encode('utf-8').strip()
+        url = recode_uri(url)
         html = urllib.request.urlopen(
             url
         )
