@@ -64,76 +64,76 @@ def download_video_and_meta_data(url_idx, length, target_directory, num_threads,
     video_store_filepath = os.path.abspath(f"{target_directory}/{url_idx}")
     video_store_filepath_object = pathlib.Path(video_store_filepath)
 
-    try:
-        video_url = f"https://www.youtube.com/watch?v={url_idx}"
-        video_store_filepath = os.path.abspath(f"{target_directory}/{url_idx}")
-        video_store_filepath_object = pathlib.Path(video_store_filepath)
+    # try:
+    video_url = f"https://www.youtube.com/watch?v={url_idx}"
+    video_store_filepath = os.path.abspath(f"{target_directory}/{url_idx}")
+    video_store_filepath_object = pathlib.Path(video_store_filepath)
 
-        video_store_filepath_object.mkdir(parents=True, exist_ok=True)
+    video_store_filepath_object.mkdir(parents=True, exist_ok=True)
 
-        youtube_object = pytube.YouTube(video_url)
-        video_dict = {
-            "captions": {},
-            "age_restricted": youtube_object.age_restricted,
-            "check_availability": youtube_object.check_availability(),
-            "title": youtube_object.title,
-            "rating": youtube_object.rating,
-            "length": youtube_object.length,
-            "views": youtube_object.views,
-            "author": youtube_object.author,
-            "meta_data": youtube_object.metadata.raw_metadata,
-        }
+    youtube_object = pytube.YouTube(video_url)
+    video_dict = {
+        "captions": {},
+        "age_restricted": youtube_object.age_restricted,
+        "check_availability": youtube_object.check_availability(),
+        "title": youtube_object.title,
+        "rating": youtube_object.rating,
+        "length": youtube_object.length,
+        "views": youtube_object.views,
+        "author": youtube_object.author,
+        "meta_data": youtube_object.metadata.raw_metadata,
+    }
 
-        for caption_item in youtube_object.captions:
-            video_dict["captions"][f"{caption_item.code}"] = caption_item.xml_captions
+    for caption_item in youtube_object.captions:
+        video_dict["captions"][f"{caption_item.code}"] = caption_item.xml_captions
 
-        if (
-                video_dict["age_restricted"]
-                or "en" not in video_dict["captions"]
-                and "a.en" not in video_dict["captions"]
-        ):
-            return url_idx, length, True
+    if (
+            video_dict["age_restricted"]
+            or "en" not in video_dict["captions"]
+            and "a.en" not in video_dict["captions"]
+    ):
+        return url_idx, length, True
 
-        save_dict_in_json(
-            filepath=f"{video_store_filepath}/meta_data",
-            metrics_dict=video_dict,
-            overwrite=True,
+    save_dict_in_json(
+        filepath=f"{video_store_filepath}/meta_data",
+        metrics_dict=video_dict,
+        overwrite=True,
+    )
+
+    video_low_def = youtube_object.streams.get_by_resolution(
+        resolution=resolution_identifier)
+
+    if video_low_def is None:
+        logging.info(f"Can't find "
+                     f"{resolution_identifier} version of, "
+                     f"{url_idx},"
+                     f"{youtube_object.streams}")
+    else:
+        logging.info(f"Download "
+                     f"{resolution_identifier} version of, "
+                     f"{url_idx},"
+                     f"{video_store_filepath}/"
+                     f"full_video_{resolution_identifier}.mp4")
+
+        video_low_def.download(
+            output_path=f"{video_store_filepath}/",
+            filename=f"full_video_{resolution_identifier}.mp4",
+            max_retries=1,
         )
-
-        video_low_def = youtube_object.streams.get_by_resolution(
-            resolution=resolution_identifier)
-
-        if video_low_def is None:
-            logging.info(f"Can't find "
-                         f"{resolution_identifier} version of, "
-                         f"{url_idx},"
-                         f"{youtube_object.streams}")
-        else:
-            logging.info(f"Download "
-                         f"{resolution_identifier} version of, "
-                         f"{url_idx},"
-                         f"{video_store_filepath}/"
-                         f"full_video_{resolution_identifier}.mp4")
-
-            video_low_def.download(
-                output_path=f"{video_store_filepath}/",
-                filename=f"full_video_{resolution_identifier}.mp4",
-                max_retries=1,
-            )
-    except Exception:
-
-        # Just print(e) is cleaner and more likely what you want,
-
-        # but if you insist on printing message specifically whenever possible...
-
-        logging.exception(f'Video {video_url}, {video_store_filepath_object} has gone boom, '
-                          f'will now delete this file')
-
-        # if input_video_low_def_path is not None:
-        #     os.remove(input_video_low_def_path)
-
-        return url_idx, length, False
-        # input_video_low_def_path = f"{video_store_filepath}/" \
+    # except Exception:
+    #
+    #     # Just print(e) is cleaner and more likely what you want,
+    #
+    #     # but if you insist on printing message specifically whenever possible...
+    #
+    #     logging.exception(f'Video {video_url}, {video_store_filepath_object} has gone boom, '
+    #                       f'will now delete this file')
+    #
+    #     # if input_video_low_def_path is not None:
+    #     #     os.remove(input_video_low_def_path)
+    #
+    #     return url_idx, length, False
+    #     # input_video_low_def_path = f"{video_store_filepath}/" \
         #                            f"full_video_{resolution_identifier}.mp4"
         #
         # clip_count = 0
@@ -190,12 +190,15 @@ def download_length(video_url_idx):
     :return: True is successful and False if not
     """
     # init an HTML Session
+    url = f"https://www.youtube.com/watch?v={video_url_idx}"
+
     try:
         url = f"https://www.youtube.com/watch?v={video_url_idx}"
         youtube_object = pytube.YouTube(url)
         length = youtube_object.length
         return video_url_idx, length
-    except:
+    except Exception:
+        logging.exception(f'Couldn\'t get length for {url}')
         return video_url_idx, 0
 
 
@@ -219,7 +222,8 @@ def search_for_terms(terms, sort_type="relevance", n=3):
         html = html.read().decode()
 
         terms = re.findall(pattern=r"watch\?v=(\S{11})", string=html)[:n]
-    except:
+    except Exception:
+        logging.exception(f'Couldn\'t find any search results for terms {terms}')
         terms = []
 
     return terms
@@ -322,7 +326,7 @@ def parallel_download_video_and_meta_data(
             ):
                 pbar.update(length)
                 pbar.set_description(
-                    f'Done processing the "{url_idx}: {length} -> {result}" query'
+                    f'Done downloading the "{url_idx}: {length} -> {result}" query'
                 )
                 url_idx_to_status_dict[url_idx] = result
                 if video_idx % 1 == 0:
