@@ -57,6 +57,8 @@ def download_video_and_meta_data(url_idx, length, target_directory, num_threads,
     :return: True is succesful and False if not
     """
     # init an HTML Session
+    time.sleep(sleep_duration)
+    logging.info(f'Sleeping for {sleep_duration} seconds..')
     input_video_low_def_path = None
     try:
         video_url = f"https://www.youtube.com/watch?v={url_idx}"
@@ -106,8 +108,6 @@ def download_video_and_meta_data(url_idx, length, target_directory, num_threads,
                 filename=f"full_video_{resolution_identifier}.mp4",
                 max_retries=1,
             )
-
-            time.sleep(sleep_duration)
 
         # input_video_low_def_path = f"{video_store_filepath}/" \
         #                            f"full_video_{resolution_identifier}.mp4"
