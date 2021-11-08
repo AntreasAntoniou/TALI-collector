@@ -19,7 +19,7 @@ import bz2
 
 FORMAT = "%(message)s"
 logging.basicConfig(
-    level=logging.INFO, format=FORMAT, datefmt="[%X]", handlers=[RichHandler()]
+    level=logging.NOTSET, format=FORMAT, datefmt="[%X]", handlers=[RichHandler()]
 )
 
 logging = logging.getLogger("rich")
