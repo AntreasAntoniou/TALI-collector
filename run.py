@@ -57,9 +57,6 @@ def download_video_and_meta_data(url_idx, length, target_directory, num_threads,
     :return: True is succesful and False if not
     """
     # init an HTML Session
-    time.sleep(sleep_duration)
-    logging.info(f'Sleeping for {sleep_duration} seconds..')
-
     video_url = f"https://www.youtube.com/watch?v={url_idx}"
     video_store_filepath = os.path.abspath(f"{target_directory}/{url_idx}")
     video_store_filepath_object = pathlib.Path(video_store_filepath)
@@ -132,6 +129,9 @@ def download_video_and_meta_data(url_idx, length, target_directory, num_threads,
                          f"{url_idx}, as it already exists in "
                          f"{video_store_filepath}/full_video_{resolution_identifier}.mp4"
                          )
+
+            time.sleep(sleep_duration)
+            logging.info(f'Sleeping for {sleep_duration} seconds..')
     except Exception:
 
         # Just print(e) is cleaner and more likely what you want,
