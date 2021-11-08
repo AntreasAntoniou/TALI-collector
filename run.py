@@ -106,7 +106,7 @@ def download_video_and_meta_data(url_idx, length, target_directory, num_threads,
                          f"{url_idx},"
                          f"{youtube_object.streams}")
         else:
-            if not os.path.exists(f'{video_store_filepath}/full_video_{resolution_identifier}.bz2'):
+            if not os.path.exists(f'{video_store_filepath}/full_video_{resolution_identifier}.mp4'):
                 logging.info(f"Download "
                              f"{resolution_identifier} version of, "
                              f"{url_idx},"
@@ -118,11 +118,11 @@ def download_video_and_meta_data(url_idx, length, target_directory, num_threads,
                     filename=f"full_video_{resolution_identifier}.mp4",
                     max_retries=1,
                 )
-                with open(f"{video_store_filepath}/full_video_{resolution_identifier}.mp4", 'rb') as data:
-                    tarbz2contents = bz2.compress(data.read(), compresslevel=9)
-                    with open(f"{video_store_filepath}/full_video_{resolution_identifier}.bz2", "wb") as bzfilewriter:
-                        bzfilewriter.write(tarbz2contents)
-                    os.remove(f"{video_store_filepath}/full_video_{resolution_identifier}.mp4")
+                # with open(f"{video_store_filepath}/full_video_{resolution_identifier}.mp4", 'rb') as data:
+                #     tarbz2contents = bz2.compress(data.read(), compresslevel=9)
+                #     with open(f"{video_store_filepath}/full_video_{resolution_identifier}.bz2", "wb") as bzfilewriter:
+                #         bzfilewriter.write(tarbz2contents)
+                #     os.remove(f"{video_store_filepath}/full_video_{resolution_identifier}.mp4")
 
 
             else:
