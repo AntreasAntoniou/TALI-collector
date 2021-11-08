@@ -124,8 +124,8 @@ def download_video_and_meta_data(url_idx, length, target_directory, num_threads,
             logging.info(f"Skipping "
                          f"{resolution_identifier} version of, "
                          f"{url_idx}, as it already exists in "
-                         f"{video_store_filepath}/"
-                         f"full_video_{resolution_identifier}.mp4")
+                         f"{video_store_filepath}/full_video_{resolution_identifier}.mp4"
+                         )
     except Exception:
 
         # Just print(e) is cleaner and more likely what you want,
