@@ -15,6 +15,7 @@ from rich.logging import RichHandler
 
 from storage import load_dict_from_json, save_dict_in_json
 from yelp_uri.encoding import recode_uri
+import bz2
 
 FORMAT = "%(message)s"
 logging.basicConfig(
@@ -120,7 +121,13 @@ def download_video_and_meta_data(url_idx, length, target_directory, num_threads,
                     filename=f"full_video_{resolution_identifier}.mp4",
                     max_retries=1,
                 )
-            logging.info(f"Skipping "
+                with open(f"{video_store_filepath}/full_video_{resolution_identifier}.mp4", 'rb') as data:
+                    tarbz2contents = bz2.compress(data.read(), compresslevel=9)
+                    with open(f"{video_store_filepath}/full_video_{resolution_identifier}.bz2", "wb") as bzfilewriter:
+                        bzfilewriter.write(tarbz2contents)
+
+            else:
+                logging.info(f"Skipping "
                          f"{resolution_identifier} version of, "
                          f"{url_idx}, as it already exists in "
                          f"{video_store_filepath}/full_video_{resolution_identifier}.mp4"
