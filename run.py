@@ -15,11 +15,11 @@ from rich.logging import RichHandler
 
 from storage import load_dict_from_json, save_dict_in_json
 from yelp_uri.encoding import recode_uri
-import bz2
+
 
 FORMAT = "%(message)s"
 logging.basicConfig(
-    level=logging.NOTSET, format=FORMAT, datefmt="[%X]", handlers=[RichHandler()]
+    level=logging.INFO, format=FORMAT, datefmt="[%X]", handlers=[RichHandler()]
 )
 
 logging = logging.getLogger("rich")
