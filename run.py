@@ -122,6 +122,8 @@ def download_video_and_meta_data(url_idx, length, target_directory, num_threads,
                     tarbz2contents = bz2.compress(data.read(), compresslevel=9)
                     with open(f"{video_store_filepath}/full_video_{resolution_identifier}.bz2", "wb") as bzfilewriter:
                         bzfilewriter.write(tarbz2contents)
+                    os.remove(f"{video_store_filepath}/full_video_{resolution_identifier}.mp4")
+
 
             else:
                 logging.info(f"Skipping "
