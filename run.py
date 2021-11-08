@@ -106,7 +106,7 @@ def download_video_and_meta_data(url_idx, length, target_directory, num_threads,
                          f"{url_idx},"
                          f"{youtube_object.streams}")
         else:
-            if not os.path.exists(f'{video_store_filepath}/full_video_{resolution_identifier}.mp4'):
+            if not os.path.exists(f'{video_store_filepath}/full_video_{resolution_identifier}.bz2'):
                 logging.info(f"Download "
                              f"{resolution_identifier} version of, "
                              f"{url_idx},"
