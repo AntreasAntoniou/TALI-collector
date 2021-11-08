@@ -1,7 +1,6 @@
 import argparse
 import concurrent.futures
 import logging
-import multiprocessing as mp
 import os
 import pathlib
 import re
@@ -12,10 +11,10 @@ import urllib.request
 import numpy as np
 import pytube
 import tqdm
-from moviepy.video.io.VideoFileClip import VideoFileClip
 from rich.logging import RichHandler
 
 from storage import load_dict_from_json, save_dict_in_json
+from yelp_uri.encoding import recode_uri
 
 FORMAT = "%(message)s"
 logging.basicConfig(
@@ -206,8 +205,6 @@ def download_length(video_url_idx):
     except Exception:
         logging.exception(f'Couldn\'t get length for {url}')
         return video_url_idx, 0
-
-from yelp_uri.encoding import recode_uri
 
 def search_for_terms(terms, sort_type="relevance", n=3):
     """

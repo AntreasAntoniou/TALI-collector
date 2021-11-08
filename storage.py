@@ -1,15 +1,7 @@
 import json
 import os
 import pathlib
-import shutil
 
-import numpy as np
-import requests
-import scipy
-import scipy.misc
-import torch
-import tqdm  # progress bar
-from rich import print
 
 
 def save_dict_in_json(filepath, metrics_dict, overwrite):
