@@ -109,17 +109,23 @@ def download_video_and_meta_data(url_idx, length, target_directory, num_threads,
                          f"{url_idx},"
                          f"{youtube_object.streams}")
         else:
-            logging.info(f"Download "
+            if not os.path.exists(f'{video_store_filepath}/full_video_{resolution_identifier}.mp4'):
+                logging.info(f"Download "
+                             f"{resolution_identifier} version of, "
+                             f"{url_idx},"
+                             f"{video_store_filepath}/"
+                             f"full_video_{resolution_identifier}.mp4")
+
+                video_low_def.download(
+                    output_path=f"{video_store_filepath}/",
+                    filename=f"full_video_{resolution_identifier}.mp4",
+                    max_retries=1,
+                )
+            logging.info(f"Skipping "
                          f"{resolution_identifier} version of, "
-                         f"{url_idx},"
+                         f"{url_idx}, as it already exists in "
                          f"{video_store_filepath}/"
                          f"full_video_{resolution_identifier}.mp4")
-
-            video_low_def.download(
-                output_path=f"{video_store_filepath}/",
-                filename=f"full_video_{resolution_identifier}.mp4",
-                max_retries=1,
-            )
     except Exception:
 
         # Just print(e) is cleaner and more likely what you want,
