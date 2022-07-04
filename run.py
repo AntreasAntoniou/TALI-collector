@@ -31,8 +31,8 @@ def get_base_argument_parser():
     parser.add_argument("--num_threads", type=int, default=8)
     parser.add_argument("--seed", type=int, default=23061991)
     parser.add_argument("--total_results_per_query", type=int, default=3)
-    parser.add_argument("--target_dataset_dir", type=str, default='dataset/')
-    parser.add_argument("--resolution_identifier", type=str, default='480p')
+    parser.add_argument("--target_dataset_dir", type=str, default="dataset/")
+    parser.add_argument("--resolution_identifier", type=str, default="480p")
     parser.add_argument("--sleep_duration", type=int, default=1)
     # parser.add_argument("--rescan_dataset_files", default=False, action="store_true")
     parser = parser.parse_args()
@@ -44,8 +44,14 @@ def download_video_and_meta_data_wrapper(arg_dict):
     return download_video_and_meta_data(**arg_dict)
 
 
-def download_video_and_meta_data(url_idx, length, target_directory, num_threads,
-                                 resolution_identifier, sleep_duration):
+def download_video_and_meta_data(
+    url_idx,
+    length,
+    target_directory,
+    num_threads,
+    resolution_identifier,
+    sleep_duration,
+):
     """
     Downloads a youtube video and its meta data.
     :param resolution_identifier:
@@ -82,12 +88,14 @@ def download_video_and_meta_data(url_idx, length, target_directory, num_threads,
         }
 
         for caption_item in youtube_object.captions:
-            video_dict["captions"][f"{caption_item.code}"] = caption_item.xml_captions
+            video_dict["captions"][
+                f"{caption_item.code}"
+            ] = caption_item.xml_captions
 
         if (
-                video_dict["age_restricted"]
-                or "en" not in video_dict["captions"]
-                and "a.en" not in video_dict["captions"]
+            video_dict["age_restricted"]
+            or "en" not in video_dict["captions"]
+            and "a.en" not in video_dict["captions"]
         ):
             return url_idx, length, True
 
@@ -98,20 +106,27 @@ def download_video_and_meta_data(url_idx, length, target_directory, num_threads,
         )
 
         video_low_def = youtube_object.streams.get_by_resolution(
-            resolution=resolution_identifier)
+            resolution=resolution_identifier
+        )
 
         if video_low_def is None:
-            logging.info(f"Can't find "
-                         f"{resolution_identifier} version of, "
-                         f"{url_idx},"
-                         f"{youtube_object.streams}")
+            logging.info(
+                f"Can't find "
+                f"{resolution_identifier} version of, "
+                f"{url_idx},"
+                f"{youtube_object.streams}"
+            )
         else:
-            if not os.path.exists(f'{video_store_filepath}/full_video_{resolution_identifier}.mp4'):
-                logging.info(f"Download "
-                             f"{resolution_identifier} version of, "
-                             f"{url_idx},"
-                             f"{video_store_filepath}/"
-                             f"full_video_{resolution_identifier}.mp4")
+            if not os.path.exists(
+                f"{video_store_filepath}/full_video_{resolution_identifier}.mp4"
+            ):
+                logging.info(
+                    f"Download "
+                    f"{resolution_identifier} version of, "
+                    f"{url_idx},"
+                    f"{video_store_filepath}/"
+                    f"full_video_{resolution_identifier}.mp4"
+                )
 
                 video_low_def.download(
                     output_path=f"{video_store_filepath}/",
@@ -124,24 +139,26 @@ def download_video_and_meta_data(url_idx, length, target_directory, num_threads,
                 #         bzfilewriter.write(tarbz2contents)
                 #     os.remove(f"{video_store_filepath}/full_video_{resolution_identifier}.mp4")
 
-
             else:
-                logging.info(f"Skipping "
-                         f"{resolution_identifier} version of, "
-                         f"{url_idx}, as it already exists in "
-                         f"{video_store_filepath}/full_video_{resolution_identifier}.mp4"
-                         )
+                logging.info(
+                    f"Skipping "
+                    f"{resolution_identifier} version of, "
+                    f"{url_idx}, as it already exists in "
+                    f"{video_store_filepath}/full_video_{resolution_identifier}.mp4"
+                )
 
             time.sleep(sleep_duration)
-            logging.info(f'Sleeping for {sleep_duration} seconds..')
+            logging.info(f"Sleeping for {sleep_duration} seconds..")
     except Exception:
 
         # Just print(e) is cleaner and more likely what you want,
 
         # but if you insist on printing message specifically whenever possible...
 
-        logging.exception(f'Video {video_url}, {video_store_filepath_object} has gone boom, '
-                          f'will now delete this file')
+        logging.exception(
+            f"Video {video_url}, {video_store_filepath_object} has gone boom, "
+            f"will now delete this file"
+        )
 
         # if input_video_low_def_path is not None:
         #     os.remove(input_video_low_def_path)
@@ -192,7 +209,6 @@ def download_video_and_meta_data(url_idx, length, target_directory, num_threads,
         #     except Exception:
         #         logging.exception('Gone boom 😼')
 
-
     return url_idx, length, True
 
 
@@ -212,8 +228,9 @@ def download_length(video_url_idx):
         length = youtube_object.length
         return video_url_idx, length
     except Exception:
-        logging.exception(f'Couldn\'t get length for {url}')
+        logging.exception(f"Couldn't get length for {url}")
         return video_url_idx, 0
+
 
 def search_for_terms(terms, sort_type="relevance", n=3):
     """
@@ -229,15 +246,15 @@ def search_for_terms(terms, sort_type="relevance", n=3):
         url = f"https://www.youtube.com/results?search_query={terms}"
         f"&sp={sort_key_to_code[sort_type]}"
         url = recode_uri(url)
-        html = urllib.request.urlopen(
-            url
-        )
+        html = urllib.request.urlopen(url)
 
         html = html.read().decode()
 
         terms = re.findall(pattern=r"watch\?v=(\S{11})", string=html)[:n]
     except Exception:
-        logging.exception(f'Couldn\'t find any search results for terms {terms}')
+        logging.exception(
+            f"Couldn't find any search results for terms {terms}"
+        )
         terms = []
 
     return terms
@@ -289,14 +306,14 @@ def search_and_return_url_wrapper(arg_dict):
 
 
 def parallel_download_video_and_meta_data(
-        seed,
-        url_ids_to_length_dict,
-        target_directory,
-        url_to_status_dict_json_filepath,
-        num_threads,
-        resolution_identifier,
-        sleep_duration,
-        max_urls=-1,
+    seed,
+    url_ids_to_length_dict,
+    target_directory,
+    url_to_status_dict_json_filepath,
+    num_threads,
+    resolution_identifier,
+    sleep_duration,
+    max_urls=-1,
 ):
     np.random.seed(seed)
     idx = np.arange(len(list(url_ids_to_length_dict.keys())))
@@ -327,16 +344,24 @@ def parallel_download_video_and_meta_data(
     total_length_to_download = np.sum(values)
 
     arg_dicts = [
-        dict(url_idx=url_idx, length=length, target_directory=target_directory,
-             num_threads=num_threads, resolution_identifier=resolution_identifier, sleep_duration=sleep_duration)
+        dict(
+            url_idx=url_idx,
+            length=length,
+            target_directory=target_directory,
+            num_threads=num_threads,
+            resolution_identifier=resolution_identifier,
+            sleep_duration=sleep_duration,
+        )
         for url_idx, length in url_ids_to_length_dict.items()
     ]
 
-    with concurrent.futures.ProcessPoolExecutor(max_workers=num_threads) as executor:
+    with concurrent.futures.ProcessPoolExecutor(
+        max_workers=num_threads
+    ) as executor:
         with tqdm.tqdm(total=total_length_to_download, smoothing=0.0) as pbar:
             for video_idx, (url_idx, length, result) in enumerate(
-                    executor.map(download_video_and_meta_data_wrapper, arg_dicts),
-                    start=1
+                executor.map(download_video_and_meta_data_wrapper, arg_dicts),
+                start=1,
             ):
                 pbar.update(length)
                 pbar.set_description(
@@ -352,7 +377,11 @@ def parallel_download_video_and_meta_data(
 
 
 def parallel_search_return_url_dict(
-        search_queries, seed, num_threads, total_results_per_query=3, max_queries=-1
+    search_queries,
+    seed,
+    num_threads,
+    total_results_per_query=3,
+    max_queries=-1,
 ):
     np.random.seed(seed)
     idx = np.arange(len(search_queries))
@@ -362,22 +391,26 @@ def parallel_search_return_url_dict(
         search_queries = search_queries[:max_queries]
 
     arg_dicts = [
-        dict(search_query=search_query, total_results_per_query=total_results_per_query)
+        dict(
+            search_query=search_query,
+            total_results_per_query=total_results_per_query,
+        )
         for search_query in search_queries
     ]
 
     with tqdm.tqdm(total=len(arg_dicts), smoothing=0.0) as pbar:
         with concurrent.futures.ProcessPoolExecutor(
-                max_workers=num_threads
+            max_workers=num_threads
         ) as executor:
             query_to_url_ids_dict = {}
 
             for query_string, video_url_ids in executor.map(
-                    search_and_return_url_wrapper, arg_dicts
+                search_and_return_url_wrapper, arg_dicts
             ):
                 pbar.update(1)
                 pbar.set_description(
-                    f'Done processing the "{query_string} ->' f' {video_url_ids}" query'
+                    f'Done processing the "{query_string} ->'
+                    f' {video_url_ids}" query'
                 )
                 query_to_url_ids_dict[query_string] = video_url_ids
 
@@ -388,12 +421,15 @@ def parallel_extract_length_from_url(num_threads, url_ids):
     url_idx_to_length_dict = {}
     with tqdm.tqdm(total=len(url_ids), smoothing=0.0) as pbar:
         with concurrent.futures.ProcessPoolExecutor(
-                max_workers=num_threads
+            max_workers=num_threads
         ) as executor:
-            for video_url_idx, length in executor.map(download_length, url_ids):
+            for video_url_idx, length in executor.map(
+                download_length, url_ids
+            ):
                 pbar.update(1)
                 pbar.set_description(
-                    f'Done processing the "{video_url_idx} -> {length}"' f" query"
+                    f'Done processing the "{video_url_idx} -> {length}"'
+                    f" query"
                 )
                 if length > 0:
                     url_idx_to_length_dict[video_url_idx] = length
@@ -402,15 +438,15 @@ def parallel_extract_length_from_url(num_threads, url_ids):
 
 
 def download_dataset_given_txt_file(
-        txt_filepath,
-        dataset_directory,
-        seed,
-        total_results_per_query,
-        num_threads,
-        resolution_identifier,
-        sleep_duration,
-        max_queries=-1,
-        max_downloads_in_set=-1,
+    txt_filepath,
+    dataset_directory,
+    seed,
+    total_results_per_query,
+    num_threads,
+    resolution_identifier,
+    sleep_duration,
+    max_queries=-1,
+    max_downloads_in_set=-1,
 ):
     search_queries = list(extract_terms_from_txt(filepath=txt_filepath))
 
@@ -435,7 +471,8 @@ def download_dataset_given_txt_file(
             search_queries=search_queries,
             total_results_per_query=total_results_per_query,
             max_queries=max_queries,
-            seed=seed, num_threads=num_threads
+            seed=seed,
+            num_threads=num_threads,
         )
 
         save_dict_in_json(
@@ -445,11 +482,16 @@ def download_dataset_given_txt_file(
         )
 
     if url_to_length_json_filepath.exists():
-        url_idx_to_length = load_dict_from_json(filepath=url_to_length_json_filepath)
+        url_idx_to_length = load_dict_from_json(
+            filepath=url_to_length_json_filepath
+        )
     else:
-        urls_extended = [url for urls in query_to_url_dict.values() for url in urls]
-        url_idx_to_length = parallel_extract_length_from_url(url_ids=urls_extended,
-                                                             num_threads=num_threads)
+        urls_extended = [
+            url for urls in query_to_url_dict.values() for url in urls
+        ]
+        url_idx_to_length = parallel_extract_length_from_url(
+            url_ids=urls_extended, num_threads=num_threads
+        )
 
         save_dict_in_json(
             metrics_dict=url_idx_to_length,
@@ -462,17 +504,21 @@ def download_dataset_given_txt_file(
         target_directory=pathlib.Path(f"{dataset_directory}/"),
         url_to_status_dict_json_filepath=url_to_status_dict_json_filepath,
         max_urls=max_downloads_in_set,
-        seed=seed, num_threads=num_threads,
-        resolution_identifier=resolution_identifier, sleep_duration=sleep_duration
+        seed=seed,
+        num_threads=num_threads,
+        resolution_identifier=resolution_identifier,
+        sleep_duration=sleep_duration,
     )
 
 
 if __name__ == "__main__":
     args = get_base_argument_parser()
-    for set_name in ['debug', 'train', 'val', 'test']:
+    for set_name in ["debug", "train", "val", "test"]:
         txt_file = pathlib.Path(f"wikihow_queries/all_{set_name}.txt")
 
-        dataset_directory = pathlib.Path(f"{args.target_dataset_dir}/{set_name}")
+        dataset_directory = pathlib.Path(
+            f"{args.target_dataset_dir}/{set_name}"
+        )
         dataset_directory.mkdir(parents=True, exist_ok=True)
 
         download_dataset_given_txt_file(
@@ -481,5 +527,6 @@ if __name__ == "__main__":
             total_results_per_query=args.total_results_per_query,
             dataset_directory=str(dataset_directory),
             num_threads=args.num_threads,
-            resolution_identifier=args.resolution_identifier, sleep_duration=args.sleep_duration
+            resolution_identifier=args.resolution_identifier,
+            sleep_duration=args.sleep_duration,
         )

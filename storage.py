@@ -3,7 +3,6 @@ import os
 import pathlib
 
 
-
 def save_dict_in_json(filepath, metrics_dict, overwrite):
     """
     Saves a metrics .json file with the metrics
