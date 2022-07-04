@@ -133,11 +133,6 @@ def download_video_and_meta_data(
                     filename=f"full_video_{resolution_identifier}.mp4",
                     max_retries=1,
                 )
-                # with open(f"{video_store_filepath}/full_video_{resolution_identifier}.mp4", 'rb') as data:
-                #     tarbz2contents = bz2.compress(data.read(), compresslevel=9)
-                #     with open(f"{video_store_filepath}/full_video_{resolution_identifier}.bz2", "wb") as bzfilewriter:
-                #         bzfilewriter.write(tarbz2contents)
-                #     os.remove(f"{video_store_filepath}/full_video_{resolution_identifier}.mp4")
 
             else:
                 logging.info(
@@ -151,63 +146,12 @@ def download_video_and_meta_data(
             logging.info(f"Sleeping for {sleep_duration} seconds..")
     except Exception:
 
-        # Just print(e) is cleaner and more likely what you want,
-
-        # but if you insist on printing message specifically whenever possible...
-
         logging.exception(
             f"Video {video_url}, {video_store_filepath_object} has gone boom, "
             f"will now delete this file"
         )
 
-        # if input_video_low_def_path is not None:
-        #     os.remove(input_video_low_def_path)
-
         return url_idx, length, False
-        # input_video_low_def_path = f"{video_store_filepath}/" \
-        #                            f"full_video_{resolution_identifier}.mp4"
-
-        # clip_count = 0
-        # with VideoFileClip(input_video_low_def_path) as video_low_def:
-        #     try:
-        #         output_video_low_def_path = (
-        #             f"{video_store_filepath}/video.mp4"
-        #         )
-        #
-        #         output_audio_low_def_path = (
-        #             f"{video_store_filepath}/audio.mp3"
-        #         )
-        #
-        #         video_low_def.write_videofile(
-        #             filename=output_video_low_def_path,
-        #             fps=30,
-        #             codec="libx264",
-        #             bitrate=None,
-        #             audio=True,
-        #             audio_fps=44100,
-        #             preset="medium",
-        #             audio_nbytes=4,
-        #             audio_codec="mp3",
-        #             audio_bitrate=None,
-        #             audio_bufsize=2000,
-        #             temp_audiofile=output_audio_low_def_path,
-        #             rewrite_audio=True,
-        #             remove_temp=False,
-        #             write_logfile=False,
-        #             verbose=False,
-        #             threads=num_threads,
-        #             ffmpeg_params=None,
-        #             logger=None,
-        #         )
-        #
-        #         clip_count += 1
-        #         if os.path.exists(f"{video_store_filepath}/"
-        #                           f"full_video_{resolution_identifier}.mp4"):
-        #             os.remove(f"{video_store_filepath}/"
-        #                       f"full_video_{resolution_identifier}.mp4")
-        #
-        #     except Exception:
-        #         logging.exception('Gone boom 😼')
 
     return url_idx, length, True
 
