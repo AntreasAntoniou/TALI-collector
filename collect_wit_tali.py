@@ -7,15 +7,18 @@ import re
 import string
 import time
 import urllib.request
+from collections import defaultdict
+from random import shuffle
+from typing import Dict
 
 import numpy as np
 import pytube
 import tqdm
+from datasets import load_dataset
 from rich.logging import RichHandler
-
-from storage import load_dict_from_json, save_dict_in_json
 from yelp_uri.encoding import recode_uri
 
+from storage import load_dict_from_json, save_dict_in_json
 
 FORMAT = "%(message)s"
 logging.basicConfig(
@@ -30,9 +33,11 @@ def get_base_argument_parser():
 
     parser.add_argument("--num_threads", type=int, default=8)
     parser.add_argument("--seed", type=int, default=23061991)
-    parser.add_argument("--total_results_per_query", type=int, default=3)
-    parser.add_argument("--target_dataset_dir", type=str, default='dataset/')
-    parser.add_argument("--resolution_identifier", type=str, default='480p')
+    parser.add_argument("--total_results_per_query", type=int, default=1)
+    parser.add_argument(
+        "--target_dataset_dir", type=str, default="/mnt/nas/datasets/witty-tali"
+    )
+    parser.add_argument("--resolution_identifier", type=str, default="480p")
     parser.add_argument("--sleep_duration", type=int, default=1)
     # parser.add_argument("--rescan_dataset_files", default=False, action="store_true")
     parser = parser.parse_args()
@@ -40,12 +45,46 @@ def get_base_argument_parser():
     return parser
 
 
+def get_language_specific_wikipedia_data(sample, target_language="en"):
+    multi_lingual_wikipedia_data = sample["wit_features"]
+
+    if target_language in multi_lingual_wikipedia_data["language"]:
+        language_idx = multi_lingual_wikipedia_data["language"].index(target_language)
+        target_language_dict = {}
+        for key, value in multi_lingual_wikipedia_data.items():
+            target_language_dict[key] = value[language_idx]
+        return target_language_dict
+    else:
+        return None
+
+
+def filter_dict_by_keys(input_dict, filter_keys):
+    output_dict = {}
+    for key in filter_keys:
+        output_dict[key] = input_dict[key]
+
+    return output_dict
+
+
+useful_keys = [
+    # "caption_reference_description",
+    "context_page_description",
+    "hierarchical_section_title",
+]
+
+
 def download_video_and_meta_data_wrapper(arg_dict):
     return download_video_and_meta_data(**arg_dict)
 
 
-def download_video_and_meta_data(url_idx, length, target_directory, num_threads,
-                                 resolution_identifier, sleep_duration):
+def download_video_and_meta_data(
+    url_idx,
+    length,
+    target_directory,
+    num_threads,
+    resolution_identifier,
+    sleep_duration,
+):
     """
     Downloads a youtube video and its meta data.
     :param resolution_identifier:
@@ -85,9 +124,9 @@ def download_video_and_meta_data(url_idx, length, target_directory, num_threads,
             video_dict["captions"][f"{caption_item.code}"] = caption_item.xml_captions
 
         if (
-                video_dict["age_restricted"]
-                or "en" not in video_dict["captions"]
-                and "a.en" not in video_dict["captions"]
+            video_dict["age_restricted"]
+            or "en" not in video_dict["captions"]
+            and "a.en" not in video_dict["captions"]
         ):
             return url_idx, length, True
 
@@ -98,100 +137,52 @@ def download_video_and_meta_data(url_idx, length, target_directory, num_threads,
         )
 
         video_low_def = youtube_object.streams.get_by_resolution(
-            resolution=resolution_identifier)
+            resolution=resolution_identifier
+        )
 
         if video_low_def is None:
-            logging.info(f"Can't find "
-                         f"{resolution_identifier} version of, "
-                         f"{url_idx},"
-                         f"{youtube_object.streams}")
+            logging.info(
+                f"Can't find "
+                f"{resolution_identifier} version of, "
+                f"{url_idx},"
+                f"{youtube_object.streams}"
+            )
         else:
-            if not os.path.exists(f'{video_store_filepath}/full_video_{resolution_identifier}.mp4'):
-                logging.info(f"Download "
-                             f"{resolution_identifier} version of, "
-                             f"{url_idx},"
-                             f"{video_store_filepath}/"
-                             f"full_video_{resolution_identifier}.mp4")
+            if not os.path.exists(
+                f"{video_store_filepath}/full_video_{resolution_identifier}.mp4"
+            ):
+                logging.info(
+                    f"Download "
+                    f"{resolution_identifier} version of, "
+                    f"{url_idx},"
+                    f"{video_store_filepath}/"
+                    f"full_video_{resolution_identifier}.mp4"
+                )
 
                 video_low_def.download(
                     output_path=f"{video_store_filepath}/",
                     filename=f"full_video_{resolution_identifier}.mp4",
                     max_retries=1,
                 )
-                # with open(f"{video_store_filepath}/full_video_{resolution_identifier}.mp4", 'rb') as data:
-                #     tarbz2contents = bz2.compress(data.read(), compresslevel=9)
-                #     with open(f"{video_store_filepath}/full_video_{resolution_identifier}.bz2", "wb") as bzfilewriter:
-                #         bzfilewriter.write(tarbz2contents)
-                #     os.remove(f"{video_store_filepath}/full_video_{resolution_identifier}.mp4")
-
 
             else:
-                logging.info(f"Skipping "
-                         f"{resolution_identifier} version of, "
-                         f"{url_idx}, as it already exists in "
-                         f"{video_store_filepath}/full_video_{resolution_identifier}.mp4"
-                         )
+                logging.info(
+                    f"Skipping "
+                    f"{resolution_identifier} version of, "
+                    f"{url_idx}, as it already exists in "
+                    f"{video_store_filepath}/full_video_{resolution_identifier}.mp4"
+                )
 
             time.sleep(sleep_duration)
-            logging.info(f'Sleeping for {sleep_duration} seconds..')
+            logging.info(f"Sleeping for {sleep_duration} seconds..")
     except Exception:
 
-        # Just print(e) is cleaner and more likely what you want,
-
-        # but if you insist on printing message specifically whenever possible...
-
-        logging.exception(f'Video {video_url}, {video_store_filepath_object} has gone boom, '
-                          f'will now delete this file')
-
-        # if input_video_low_def_path is not None:
-        #     os.remove(input_video_low_def_path)
+        logging.exception(
+            f"Video {video_url}, {video_store_filepath_object} has gone boom, "
+            f"will now delete this file"
+        )
 
         return url_idx, length, False
-        # input_video_low_def_path = f"{video_store_filepath}/" \
-        #                            f"full_video_{resolution_identifier}.mp4"
-
-        # clip_count = 0
-        # with VideoFileClip(input_video_low_def_path) as video_low_def:
-        #     try:
-        #         output_video_low_def_path = (
-        #             f"{video_store_filepath}/video.mp4"
-        #         )
-        #
-        #         output_audio_low_def_path = (
-        #             f"{video_store_filepath}/audio.mp3"
-        #         )
-        #
-        #         video_low_def.write_videofile(
-        #             filename=output_video_low_def_path,
-        #             fps=30,
-        #             codec="libx264",
-        #             bitrate=None,
-        #             audio=True,
-        #             audio_fps=44100,
-        #             preset="medium",
-        #             audio_nbytes=4,
-        #             audio_codec="mp3",
-        #             audio_bitrate=None,
-        #             audio_bufsize=2000,
-        #             temp_audiofile=output_audio_low_def_path,
-        #             rewrite_audio=True,
-        #             remove_temp=False,
-        #             write_logfile=False,
-        #             verbose=False,
-        #             threads=num_threads,
-        #             ffmpeg_params=None,
-        #             logger=None,
-        #         )
-        #
-        #         clip_count += 1
-        #         if os.path.exists(f"{video_store_filepath}/"
-        #                           f"full_video_{resolution_identifier}.mp4"):
-        #             os.remove(f"{video_store_filepath}/"
-        #                       f"full_video_{resolution_identifier}.mp4")
-        #
-        #     except Exception:
-        #         logging.exception('Gone boom 😼')
-
 
     return url_idx, length, True
 
@@ -212,8 +203,9 @@ def download_length(video_url_idx):
         length = youtube_object.length
         return video_url_idx, length
     except Exception:
-        logging.exception(f'Couldn\'t get length for {url}')
+        logging.exception(f"Couldn't get length for {url}")
         return video_url_idx, 0
+
 
 def search_for_terms(terms, sort_type="relevance", n=3):
     """
@@ -229,59 +221,71 @@ def search_for_terms(terms, sort_type="relevance", n=3):
         url = f"https://www.youtube.com/results?search_query={terms}"
         f"&sp={sort_key_to_code[sort_type]}"
         url = recode_uri(url)
-        html = urllib.request.urlopen(
-            url
-        )
+        html = urllib.request.urlopen(url)
 
         html = html.read().decode()
 
         terms = re.findall(pattern=r"watch\?v=(\S{11})", string=html)[:n]
     except Exception:
-        logging.exception(f'Couldn\'t find any search results for terms {terms}')
+        logging.exception(f"Couldn't find any search results for terms {terms}")
         terms = []
 
     return terms
 
 
-def extract_terms_from_txt(filepath: string) -> set:
+def extract_terms_from_dataset(dataset, set_ids) -> Dict:
     """
     Read a txt file and extract a list of query terms
     :rtype: A set object containing query terms extracted from the input txt file
     """
-    term_set = set()
-    with open(file=filepath, mode="r") as file_reader:
-        lines = file_reader.readlines()
+    term_dict = defaultdict(dict)
+    with tqdm.tqdm(total=len(set_ids)) as pbar:
+        for idx in set_ids:
+            output_dict = get_language_specific_wikipedia_data(
+                sample=dataset[idx], target_language="en"
+            )
+            if output_dict is not None:
+                output_dict = filter_dict_by_keys(
+                    input_dict=output_dict, filter_keys=useful_keys
+                )
+            else:
+                output_dict = {}
 
-    for line in lines:
-        line = line[5:].replace("\n", "")
-        last_character_digit_match = re.search(r"\d$", line)
-        # if the string ends in digits m will be a Match object, or None otherwise.
-        if last_character_digit_match is not None:
-            line = line[:1]
+            if dataset[idx]["caption_attribution_description"] is not None:
+                bits = dataset[idx]["caption_attribution_description"].split(":")
+                output_dict["caption"] = ":".join(bits[1:])
 
-        terms = re.findall("[A-Z][^A-Z]*", line)
+                for key, value in output_dict.items():
+                    if value is not None:
+                        terms = re.findall("[A-Z][^A-Z]*", value)
 
-        term_string = "+".join(terms)
-        term_set.add(term_string)
+                        term_string = "+".join(terms)
+                        if key not in term_dict[idx]:
+                            term_dict[idx][key] = [term_string]
+                        else:
+                            term_dict[idx][key].append(term_string)
+            pbar.update(1)
 
-    return term_set
+    return term_dict
 
 
-def search_and_return_url(search_query, total_results_per_query):
+def search_and_return_url(search_idx, search_query, total_results_per_query):
     """
     :param total_results_per_query:
     :param search_query:
     :return:
     """
-    search_query = f"How+to+{search_query}"
-    url_list = []
-    for sort_type in ["relevance", "view-counts"]:
-        url_idxs = search_for_terms(
-            terms=search_query, sort_type=sort_type, n=total_results_per_query
-        )
-        url_list.extend(url_idxs)
 
-    return search_query, url_list
+    url_list = set()
+    for query_type, queries in search_query.items():
+        for sort_type in ["relevance", "view-counts"]:
+            for query in queries:
+                url_idxs = search_for_terms(
+                    terms=query, sort_type=sort_type, n=total_results_per_query
+                )
+                url_list.add(url_idxs)
+    search_query["url_list"] = list(url_list)
+    return search_idx, search_query
 
 
 def search_and_return_url_wrapper(arg_dict):
@@ -289,14 +293,14 @@ def search_and_return_url_wrapper(arg_dict):
 
 
 def parallel_download_video_and_meta_data(
-        seed,
-        url_ids_to_length_dict,
-        target_directory,
-        url_to_status_dict_json_filepath,
-        num_threads,
-        resolution_identifier,
-        sleep_duration,
-        max_urls=-1,
+    seed,
+    url_ids_to_length_dict,
+    target_directory,
+    url_to_status_dict_json_filepath,
+    num_threads,
+    resolution_identifier,
+    sleep_duration,
+    max_urls=-1,
 ):
     np.random.seed(seed)
     idx = np.arange(len(list(url_ids_to_length_dict.keys())))
@@ -327,16 +331,21 @@ def parallel_download_video_and_meta_data(
     total_length_to_download = np.sum(values)
 
     arg_dicts = [
-        dict(url_idx=url_idx, length=length, target_directory=target_directory,
-             num_threads=num_threads, resolution_identifier=resolution_identifier, sleep_duration=sleep_duration)
+        dict(
+            url_idx=url_idx,
+            length=length,
+            target_directory=target_directory,
+            num_threads=num_threads,
+            resolution_identifier=resolution_identifier,
+            sleep_duration=sleep_duration,
+        )
         for url_idx, length in url_ids_to_length_dict.items()
     ]
 
     with concurrent.futures.ProcessPoolExecutor(max_workers=num_threads) as executor:
         with tqdm.tqdm(total=total_length_to_download, smoothing=0.0) as pbar:
             for video_idx, (url_idx, length, result) in enumerate(
-                    executor.map(download_video_and_meta_data_wrapper, arg_dicts),
-                    start=1
+                executor.map(download_video_and_meta_data_wrapper, arg_dicts), start=1
             ):
                 pbar.update(length)
                 pbar.set_description(
@@ -352,34 +361,33 @@ def parallel_download_video_and_meta_data(
 
 
 def parallel_search_return_url_dict(
-        search_queries, seed, num_threads, total_results_per_query=3, max_queries=-1
+    search_queries, seed, num_threads, total_results_per_query=3, max_queries=-1
 ):
     np.random.seed(seed)
-    idx = np.arange(len(search_queries))
-    np.random.shuffle(idx)
-    search_queries = [search_queries[i] for i in idx]
     if max_queries != -1:
         search_queries = search_queries[:max_queries]
 
     arg_dicts = [
-        dict(search_query=search_query, total_results_per_query=total_results_per_query)
-        for search_query in search_queries
+        dict(
+            search_idx=search_idx,
+            search_query=search_query,
+            total_results_per_query=total_results_per_query,
+        )
+        for search_idx, search_query in search_queries.items()
     ]
 
     with tqdm.tqdm(total=len(arg_dicts), smoothing=0.0) as pbar:
         with concurrent.futures.ProcessPoolExecutor(
-                max_workers=num_threads
+            max_workers=num_threads
         ) as executor:
             query_to_url_ids_dict = {}
 
-            for query_string, video_url_ids in executor.map(
-                    search_and_return_url_wrapper, arg_dicts
+            for search_idx, query_dict_with_urls in executor.map(
+                search_and_return_url_wrapper, arg_dicts
             ):
                 pbar.update(1)
-                pbar.set_description(
-                    f'Done processing the "{query_string} ->' f' {video_url_ids}" query'
-                )
-                query_to_url_ids_dict[query_string] = video_url_ids
+                pbar.set_description(f"Done processing {query_dict_with_urls}")
+                query_to_url_ids_dict[search_idx] = query_dict_with_urls
 
     return query_to_url_ids_dict
 
@@ -388,12 +396,12 @@ def parallel_extract_length_from_url(num_threads, url_ids):
     url_idx_to_length_dict = {}
     with tqdm.tqdm(total=len(url_ids), smoothing=0.0) as pbar:
         with concurrent.futures.ProcessPoolExecutor(
-                max_workers=num_threads
+            max_workers=num_threads
         ) as executor:
             for video_url_idx, length in executor.map(download_length, url_ids):
                 pbar.update(1)
                 pbar.set_description(
-                    f'Done processing the "{video_url_idx} -> {length}"' f" query"
+                    f'Done processing the "{video_url_idx} -> {length}"'
                 )
                 if length > 0:
                     url_idx_to_length_dict[video_url_idx] = length
@@ -401,18 +409,19 @@ def parallel_extract_length_from_url(num_threads, url_ids):
     return url_idx_to_length_dict
 
 
-def download_dataset_given_txt_file(
-        txt_filepath,
-        dataset_directory,
-        seed,
-        total_results_per_query,
-        num_threads,
-        resolution_identifier,
-        sleep_duration,
-        max_queries=-1,
-        max_downloads_in_set=-1,
+def download_dataset_given_ids(
+    set_ids,
+    dataset,
+    dataset_directory,
+    seed,
+    total_results_per_query,
+    num_threads,
+    resolution_identifier,
+    sleep_duration,
+    max_queries=-1,
+    max_downloads_in_set=-1,
 ):
-    search_queries = list(extract_terms_from_txt(filepath=txt_filepath))
+    search_queries_dict = extract_terms_from_dataset(dataset=dataset, set_ids=set_ids)
 
     query_to_url_dict_json_filepath = pathlib.Path(
         f"{dataset_directory}/query_to_url_idx.json"
@@ -427,19 +436,20 @@ def download_dataset_given_txt_file(
     )
 
     if query_to_url_dict_json_filepath.exists():
-        query_to_url_dict = load_dict_from_json(
+        search_idx_to_query_dict = load_dict_from_json(
             filepath=query_to_url_dict_json_filepath
         )
     else:
-        query_to_url_dict = parallel_search_return_url_dict(
-            search_queries=search_queries,
+        search_idx_to_query_dict = parallel_search_return_url_dict(
+            search_queries=search_queries_dict,
             total_results_per_query=total_results_per_query,
             max_queries=max_queries,
-            seed=seed, num_threads=num_threads
+            seed=seed,
+            num_threads=num_threads,
         )
 
         save_dict_in_json(
-            metrics_dict=query_to_url_dict,
+            metrics_dict=search_idx_to_query_dict,
             filepath=query_to_url_dict_json_filepath,
             overwrite=True,
         )
@@ -447,9 +457,14 @@ def download_dataset_given_txt_file(
     if url_to_length_json_filepath.exists():
         url_idx_to_length = load_dict_from_json(filepath=url_to_length_json_filepath)
     else:
-        urls_extended = [url for urls in query_to_url_dict.values() for url in urls]
-        url_idx_to_length = parallel_extract_length_from_url(url_ids=urls_extended,
-                                                             num_threads=num_threads)
+        urls_extended = [
+            url
+            for value in search_idx_to_query_dict.values()
+            for url in value["url_list"]
+        ]
+        url_idx_to_length = parallel_extract_length_from_url(
+            url_ids=urls_extended, num_threads=num_threads
+        )
 
         save_dict_in_json(
             metrics_dict=url_idx_to_length,
@@ -462,24 +477,46 @@ def download_dataset_given_txt_file(
         target_directory=pathlib.Path(f"{dataset_directory}/"),
         url_to_status_dict_json_filepath=url_to_status_dict_json_filepath,
         max_urls=max_downloads_in_set,
-        seed=seed, num_threads=num_threads,
-        resolution_identifier=resolution_identifier, sleep_duration=sleep_duration
+        seed=seed,
+        num_threads=num_threads,
+        resolution_identifier=resolution_identifier,
+        sleep_duration=sleep_duration,
     )
 
 
 if __name__ == "__main__":
     args = get_base_argument_parser()
-    for set_name in ['debug', 'train', 'val', 'test']:
-        txt_file = pathlib.Path(f"wikihow_queries/all_{set_name}.txt")
+    dataset = load_dataset(
+        "wikimedia/wit_base", split="train", cache_dir="/mnt/nas/datasets/"
+    )
+    dataset_ids = [i for i in range(len(dataset))]
+    shuffle(dataset_ids)
+    split_dict = {"train": 0.6, "val": 0.2, "test": 0.2}
+    train_ids = dataset_ids[: int(split_dict["train"] * len(dataset_ids))]
+    val_ids = dataset_ids[
+        int(split_dict["train"] * len(dataset_ids)) : int(
+            split_dict["train"] * len(dataset_ids)
+        )
+        + int(split_dict["val"] * len(dataset_ids))
+    ]
+    test_ids = dataset_ids[
+        int(split_dict["train"] * len(dataset_ids))
+        + int(split_dict["val"] * len(dataset_ids)) :
+    ]
+    id_dict = {"train": train_ids, "val": val_ids, "test": test_ids}
 
+    for set_name in ["train", "val", "test"]:
+        set_ids = id_dict[set_name]
         dataset_directory = pathlib.Path(f"{args.target_dataset_dir}/{set_name}")
         dataset_directory.mkdir(parents=True, exist_ok=True)
 
-        download_dataset_given_txt_file(
-            txt_filepath=txt_file,
+        download_dataset_given_ids(
+            set_ids=set_ids,
+            dataset=dataset,
             seed=args.seed,
             total_results_per_query=args.total_results_per_query,
             dataset_directory=str(dataset_directory),
             num_threads=args.num_threads,
-            resolution_identifier=args.resolution_identifier, sleep_duration=args.sleep_duration
+            resolution_identifier=args.resolution_identifier,
+            sleep_duration=args.sleep_duration,
         )
