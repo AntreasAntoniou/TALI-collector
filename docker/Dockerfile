@@ -1,0 +1,32 @@
+FROM gcr.io/deeplearning-platform-release/pytorch-cpu.1-4:latest
+
+SHELL ["/bin/bash", "-c"]
+
+RUN apt-get update
+RUN conda init bash
+RUN conda create -n tali-collector python=3.10 -y
+RUN echo "conda activate tali-collector" >> ~/.bashrc
+
+RUN git clone https://github.com/AntreasAntoniou/TALI-collector.git
+
+SHELL ["conda", "run", "-n", "tali-collector", "/bin/bash", "-c"]
+
+RUN cd TALI-collector \
+    && conda install -c conda-forge mamba -y \
+    && mamba install pytorch torchvision torchaudio -c pytorch -c conda-forge \
+    && bash install_dependencies.sh
+
+RUN apt install fish -y \
+    && mamba install starship -y
+
+RUN apt install libgl1-mesa-glx -y
+RUN apt-get install 'ffmpeg'\
+    'libsm6'\
+    'libxext6'  -y \
+
+RUN cd TALI-collector \
+    && git pull
+
+CWD /TALI-collector
+
+CMD ["bin/bash"]
