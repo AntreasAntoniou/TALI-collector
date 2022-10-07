@@ -1,8 +1,7 @@
-FROM gcr.io/tpu-pytorch/xla:nightly_3.8_tpuvm
+FROM gcr.io/deeplearning-platform-release/pytorch-cpu.1-4:latest
 
 SHELL ["/bin/bash", "-c"]
 
-RUN apt-get update
 RUN conda init bash
 RUN conda create -n tali-collector python=3.10 -y
 RUN echo "conda activate tali-collector" >> ~/.bashrc
