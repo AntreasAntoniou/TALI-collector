@@ -21,4 +21,4 @@ RUN cd TALI-collector \
 
 WORKDIR /TALI-collector
 
-CMD ["bin/bash"]
+CMD ["/bin/bash"]
