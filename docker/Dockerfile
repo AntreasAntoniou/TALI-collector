@@ -27,6 +27,6 @@ RUN apt-get install 'ffmpeg'\
 RUN cd TALI-collector \
     && git pull
 
-CWD /TALI-collector
+WORKDIR /TALI-collector
 
 CMD ["bin/bash"]
