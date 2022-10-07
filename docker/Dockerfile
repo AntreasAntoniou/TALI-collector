@@ -1,4 +1,4 @@
-FROM gcr.io/deeplearning-platform-release/pytorch-cpu.1-4:latest
+FROM gcr.io/tpu-pytorch/xla:nightly_3.8_tpuvm
 
 SHELL ["/bin/bash", "-c"]
 
@@ -18,11 +18,6 @@ RUN cd TALI-collector \
 
 RUN apt install fish -y \
     && mamba install starship -y
-
-RUN apt install libgl1-mesa-glx -y
-RUN apt-get install 'ffmpeg'\
-    'libsm6'\
-    'libxext6'  -y
 
 RUN cd TALI-collector \
     && git pull
