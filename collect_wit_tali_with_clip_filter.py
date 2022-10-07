@@ -6,6 +6,7 @@ import re
 import shutil
 import sys
 import time
+import traceback
 import urllib.request
 from collections import defaultdict
 from dataclasses import dataclass
@@ -25,7 +26,7 @@ from yelp_uri.encoding import recode_uri
 from clip_helper import get_scores
 from utils import convert_keys_to_str, load_text_into_language_time_stamps, save_json
 
-# install(show_locals=False, word_wrap=True, width=350, max_frames=1000)
+install()
 
 FORMAT = "%(message)s"
 logging.basicConfig(
@@ -53,6 +54,7 @@ def get_base_argument_parser():
     parser.add_argument("--target_language", type=str, default="en")
     parser.add_argument("--samples_per_bucket", type=int, default=20000)
     parser.add_argument("--wit_cache_dir", type=str, default="/mnt/nas/datasets/")
+    parser.add_argument("--clip_cutoff", type=float, default=0.5)
 
     parser = parser.parse_args()
 
@@ -61,8 +63,10 @@ def get_base_argument_parser():
 
 args = get_base_argument_parser()
 print("Starting TALI-WIT collection 🦾")
+
 score_table_folderpath = pathlib.Path(args.target_dataset_dir) / "score_table.parquet"
 dataset_table_folderpath = pathlib.Path(args.target_dataset_dir) / "dataset.parquet"
+captions_table_folderpath = pathlib.Path(args.target_dataset_dir) / "captions"
 
 
 if not score_table_folderpath.exists():
@@ -70,6 +74,9 @@ if not score_table_folderpath.exists():
 
 if not dataset_table_folderpath.exists():
     dataset_table_folderpath.mkdir(parents=True, exist_ok=True)
+
+if not captions_table_folderpath.exists():
+    captions_table_folderpath.mkdir(parents=True, exist_ok=True)
 
 
 class PoolType:
@@ -119,11 +126,8 @@ class VideoDataOutput:
     embed_url: Optional[str] = None
     video_id: Optional[str] = None
     title: Optional[str] = None
-    captions: Optional[Dict] = None
-    availability: Optional[bool] = None
     length: Optional[int] = None
     age_restricted: Optional[bool] = None
-    rating: Optional[float] = None
     views: Optional[int] = None
     author: Optional[str] = None
     thumbnail_url: Optional[str] = None
@@ -143,12 +147,6 @@ class CaptionDataOutput:
 def download_video_meta_data_and_youtube_object(
     video_id: str, target_directory: Union[str, pathlib.Path]
 ) -> Tuple[VideoDataOutput, CaptionDataOutput, pytube.YouTube]:
-    video_url = f"https://www.youtube.com/watch?v={video_id}"
-    target_directory = (
-        pathlib.Path(target_directory)
-        if isinstance(target_directory, str)
-        else target_directory
-    )
 
     try:
         video_url = f"https://www.youtube.com/watch?v={video_id}"
@@ -173,9 +171,7 @@ def download_video_meta_data_and_youtube_object(
             watch_url=youtube_object.watch_url,
             embed_url=youtube_object.embed_url,
             age_restricted=youtube_object.age_restricted,
-            availability=youtube_object.check_availability(),
             title=youtube_object.title,
-            rating=youtube_object.rating,
             length=youtube_object.length,
             views=youtube_object.views,
             author=youtube_object.author,
@@ -193,10 +189,10 @@ def download_video_meta_data_and_youtube_object(
         return metadata_output, captions, youtube_object
     except Exception:
 
-        logging.exception(
-            f"Video {video_url}, {target_directory.as_posix()} has gone boom, "
-            f"will now delete this file"
-        )
+        # logging.exception(
+        #     f"Video {video_url}, {target_directory.as_posix()} has gone boom, "
+        #     f"will now delete this file"
+        # )
 
         return None
 
@@ -242,23 +238,23 @@ def download_video_and_meta_data(
     )
 
     if requested_video_resolution_stream is None:
-        logging.info(
-            f"Can't find "
-            f"{resolution_identifier} version of, "
-            f"{video_id},"
-            f"{youtube_object.streams}"
-        )
+        # logging.info(
+        #     f"Can't find "
+        #     f"{resolution_identifier} version of, "
+        #     f"{video_id},"
+        #     f"{youtube_object.streams}"
+        # )
         return VideoDownloaderObject(success=False, video_id=video_id)
     else:
         video_filepath = target_directory / f"{resolution_identifier}.mp4"
 
-        logging.info(
-            f"Download "
-            f"{resolution_identifier} version of, "
-            f"{video_id},"
-            f"{target_directory.as_posix()}/"
-            f"{resolution_identifier}.mp4"
-        )
+        # logging.info(
+        #     f"Download "
+        #     f"{resolution_identifier} version of, "
+        #     f"{video_id},"
+        #     f"{target_directory.as_posix()}/"
+        #     f"{resolution_identifier}.mp4"
+        # )
 
         try:
             if not target_directory.exists():
@@ -273,10 +269,10 @@ def download_video_and_meta_data(
 
         except Exception:
             shutil.rmtree(target_directory.as_posix())
-            logging.exception(
-                f"Video {video_id}, {target_directory.as_posix()} has gone boom, "
-                f"will now delete this file"
-            )
+            # logging.exception(
+            #     f"Video {video_id}, {target_directory.as_posix()} has gone boom, "
+            #     f"will now delete this file"
+            # )
             return VideoDownloaderObject(success=False, video_id=video_id)
 
         metadata_output.video_store_filepath = video_filepath.as_posix()
@@ -287,7 +283,7 @@ def download_video_and_meta_data(
         )
 
         caption_table = (
-            dataset_table_folderpath
+            captions_table_folderpath
             / f"{sort_type.name}/{wit_idx}/{term_idx}/{video_id}/captions.json"
         )
 
@@ -320,12 +316,12 @@ def download_video_and_meta_data(
             save_json(filepath=caption_table, target_dict=captions_dict)
 
             time.sleep(sleep_duration)
-            logging.info(f"Sleeping for {sleep_duration} seconds..")
+            # logging.info(f" for {sleep_duration} seconds..")
         except Exception:
-            logging.exception(
-                f"Video {video_id}, {target_directory.as_posix()} has gone boom, "
-                f"will now delete this file. Exception was {sys.exc_info()[0]}"
-            )
+            # logging.exception(
+            #     f"Video {video_id}, {target_directory.as_posix()} has gone boom, "
+            #     f"will now delete this file. Exception was {sys.exc_info()[0]}"
+            # )
             return VideoDownloaderObject(success=False, video_id=video_id)
 
     return VideoDownloaderObject(success=True, video_id=video_id)
@@ -357,7 +353,7 @@ def search_for_video_ids(
 
         terms = re.findall(pattern=r"watch\?v=(\S{11})", string=html)[:n]
     except Exception:
-        logging.exception(f"Couldn't find any search results for terms {terms_string}")
+        # logging.exception(f"Couldn't find any search results for terms {terms_string}")
         terms = []
 
     return terms
@@ -398,7 +394,6 @@ def search_and_return_url(
     for query_type, queries in search_query.items():
         for sort_type in [
             SortKeyStringToCode.relevance,
-            SortKeyStringToCode.view_counts,
         ]:
             for query in queries:
                 url_idxs = search_for_video_ids(
@@ -444,6 +439,7 @@ def filter_video_ids_with_clip(
             reference_text=reference_term,
             query_text=titles,
             query_ids=valid_video_ids_related_to_term,
+            cutoff=args.clip_cutoff,
         )
 
         if len(clip_scores.sorted_args) > 0:
@@ -491,48 +487,53 @@ def filter_video_ids_with_clip(
 def download_video_meta_data_given_sample(
     sample: Dict, wit_idx: int, target_directory: Union[str, pathlib.Path]
 ):
-    target_directory = (
-        pathlib.Path(target_directory)
-        if isinstance(target_directory, str)
-        else target_directory
-    )
-    outputs = []
-    search_term_dict = extract_terms_dict_from_sample(sample=sample)
-    target_directory = pathlib.Path(target_directory)
-    for term_idx, (term_name, term_values) in enumerate(search_term_dict.items()):
-        for sort_type in [
-            SortKeyStringToCode.relevance,
-            SortKeyStringToCode.view_counts,
-        ]:
-            term_related_video_ids = search_for_video_ids(
-                terms_string=term_values,
-                n=args.total_results_per_query,
-                sort_type=sort_type,
-            )
-            term_related_video_ids = list(set(term_related_video_ids))
-
-            term_related_video_ids = filter_video_ids_with_clip(
-                reference_term=term_values,
-                term_related_video_ids=term_related_video_ids,
-                target_directory=target_directory,
-                wit_idx=wit_idx,
-                term_idx=term_idx,
-                sort_type=sort_type,
-            )
-
-            for video_id in term_related_video_ids:
-                video_directory_path = target_directory / str(wit_idx) / str(video_id)
-
-                output = download_video_and_meta_data(
-                    video_id=video_id,
-                    term_idx=term_idx,
-                    wit_idx=wit_idx,
+    try:
+        target_directory = (
+            pathlib.Path(target_directory)
+            if isinstance(target_directory, str)
+            else target_directory
+        )
+        outputs = []
+        search_term_dict = extract_terms_dict_from_sample(sample=sample)
+        target_directory = pathlib.Path(target_directory)
+        for term_idx, (term_name, term_values) in enumerate(search_term_dict.items()):
+            for sort_type in [
+                SortKeyStringToCode.relevance,
+            ]:
+                term_related_video_ids = search_for_video_ids(
+                    terms_string=term_values,
+                    n=args.total_results_per_query,
                     sort_type=sort_type,
-                    target_directory=video_directory_path,
-                    resolution_identifier=args.resolution_identifier,
-                    sleep_duration=args.sleep_duration,
                 )
-                outputs.append(output)
+                term_related_video_ids = list(set(term_related_video_ids))
+
+                term_related_video_ids = filter_video_ids_with_clip(
+                    reference_term=term_values,
+                    term_related_video_ids=term_related_video_ids,
+                    target_directory=target_directory,
+                    wit_idx=wit_idx,
+                    term_idx=term_idx,
+                    sort_type=sort_type,
+                )
+
+                for video_id in term_related_video_ids:
+                    video_directory_path = (
+                        target_directory / str(wit_idx) / str(video_id)
+                    )
+
+                    output = download_video_and_meta_data(
+                        video_id=video_id,
+                        term_idx=term_idx,
+                        wit_idx=wit_idx,
+                        sort_type=sort_type,
+                        target_directory=video_directory_path,
+                        resolution_identifier=args.resolution_identifier,
+                        sleep_duration=args.sleep_duration,
+                    )
+                    outputs.append(output)
+    except Exception:
+        outputs = []
+        print(f"Error in {wit_idx}, with exception {traceback.format_exc()}")
     return outputs
 
 
@@ -569,7 +570,7 @@ def download_dataset_given_ids(
         raise ValueError(
             f"Pool type {args.pool_type} is not supported, please use one of {PoolType}"
         )
-    logging.info(f"Using {pool_type} for parallel processing")
+    # logging.info(f"Using {pool_type} for parallel processing")
     with tqdm.tqdm(total=len(set_ids), smoothing=0.0) as pbar:
 
         with pool_type(max_workers=args.num_threads) as executor:

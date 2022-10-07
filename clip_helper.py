@@ -22,7 +22,10 @@ class CLIPOutput:
 
 
 def get_scores(
-    reference_text: str, query_text: List[str], query_ids: List[str]
+    reference_text: str,
+    query_text: List[str],
+    query_ids: List[str],
+    cutoff: float = 0.5,
 ) -> CLIPOutput:
     reference_inputs = processor(
         text=reference_text,
@@ -58,7 +61,7 @@ def get_scores(
 
     scores = scores[0].tolist()
 
-    scores = [float(score) for score in scores if float(score) > 0.5]
+    scores = [float(score) for score in scores if float(score) > cutoff]
 
     sorted_args = np.argsort(scores).tolist()
 
