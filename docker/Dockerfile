@@ -15,8 +15,6 @@ RUN cd TALI-collector \
     && mamba install pytorch torchvision torchaudio -c pytorch -c conda-forge \
     && bash install_dependencies.sh
 
-RUN apt install fish -y \
-    && mamba install starship -y
 
 RUN cd TALI-collector \
     && git pull
