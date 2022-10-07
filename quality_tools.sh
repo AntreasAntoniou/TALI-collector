@@ -1,5 +1,2 @@
-flake8 .
-jsonlint .
-yamllint .
+isort -l 88 .
 black -l 88 .
-isort .

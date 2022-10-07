@@ -18,8 +18,9 @@ import tqdm
 from datasets import load_dataset
 from rich import print
 from rich.logging import RichHandler
-from storage import load_dict_from_json, save_dict_in_json
 from yelp_uri.encoding import recode_uri
+
+from storage import load_dict_from_json, save_dict_in_json
 
 FORMAT = "%(message)s"
 logging.basicConfig(
