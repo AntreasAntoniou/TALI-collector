@@ -2,10 +2,7 @@ from dataclasses import dataclass
 from typing import List
 
 import numpy as np
-import requests
 import torch
-from PIL import Image
-from rich import print
 from transformers import CLIPModel, CLIPProcessor
 
 model = CLIPModel.from_pretrained("openai/clip-vit-large-patch14")
@@ -41,13 +38,13 @@ def get_scores(
         truncation=True,
     )
 
-    for key, value in reference_inputs.items():
-        print(key, value.shape)
-        # reference_inputs[key] = value[:, :77].to(model.device)
-
-    for key, value in query_inputs.items():
-        print(key, value.shape)
-        # query_inputs[key] = value[:, :77].to(model.device)
+    # for key, value in reference_inputs.items():
+    #     print(key, value.shape)
+    #     # reference_inputs[key] = value[:, :77].to(model.device)
+    #
+    # for key, value in query_inputs.items():
+    #     print(key, value.shape)
+    #     # query_inputs[key] = value[:, :77].to(model.device)
 
     with torch.no_grad():
         reference_features = model.get_text_features(**reference_inputs)

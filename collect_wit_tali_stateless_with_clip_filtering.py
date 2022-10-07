@@ -3,38 +3,28 @@ import concurrent.futures
 import logging
 import os
 import pathlib
-import random
 import re
-import string
 import time
 import urllib.request
 from collections import defaultdict
-from random import shuffle
 from typing import Dict
 
-import numpy as np
 import pyarrow as pa
 import pyarrow.parquet as pq
 import pytube
 import tqdm
 from datasets import load_dataset
-from rich import print
 from rich.logging import RichHandler
 from rich.traceback import install
-from transformers import CLIPModel
 from yelp_uri.encoding import recode_uri
 
 from clip_helper import get_scores
-from storage import load_dict_from_json, save_dict_in_json
+from storage import save_dict_in_json
+from utils import get_logger
 
 install(show_locals=False, word_wrap=True, width=350)
 
-FORMAT = "%(message)s"
-logging.basicConfig(
-    level=logging.INFO, format=FORMAT, datefmt="[%X]", handlers=[RichHandler()]
-)
-
-logging = logging.getLogger("rich")
+logger = get_logger()
 
 
 def get_base_argument_parser():
@@ -141,7 +131,7 @@ def download_video_meta_data_and_youtube_object(video_id: str, target_directory:
         return video_dict, youtube_object
     except Exception:
 
-        logging.exception(
+        logger.exception(
             f"Video {video_url}, {video_store_filepath_object} has gone boom, "
             f"will now delete this file"
         )
@@ -170,7 +160,7 @@ def download_video_and_meta_data(
     )
 
     if video_low_def is None:
-        logging.info(
+        logger.info(
             f"Can't find "
             f"{resolution_identifier} version of, "
             f"{video_id},"
@@ -180,7 +170,7 @@ def download_video_and_meta_data(
         if not os.path.exists(
             f"{video_store_filepath}/full_video_{resolution_identifier}.mp4"
         ):
-            logging.info(
+            logger.info(
                 f"Download "
                 f"{resolution_identifier} version of, "
                 f"{video_id},"
@@ -195,7 +185,7 @@ def download_video_and_meta_data(
             )
 
         else:
-            logging.info(
+            logger.info(
                 f"Skipping "
                 f"{resolution_identifier} version of, "
                 f"{video_id}, as it already exists in "
@@ -203,7 +193,7 @@ def download_video_and_meta_data(
             )
 
         time.sleep(sleep_duration)
-        logging.info(f"Sleeping for {sleep_duration} seconds..")
+        logger.info(f"Sleeping for {sleep_duration} seconds..")
 
     return video_id, True
 
@@ -217,7 +207,7 @@ def download_length(video_url_idx):
         length = youtube_object.length
         return video_url_idx, length
     except Exception:
-        logging.exception(f"Couldn't get length for {url}")
+        logger.exception(f"Couldn't get length for {url}")
         return video_url_idx, 0
 
 
@@ -233,7 +223,7 @@ def search_for_video_ids(terms_string: str, sort_type: str = "relevance", n: int
 
         terms = re.findall(pattern=r"watch\?v=(\S{11})", string=html)[:n]
     except Exception:
-        logging.exception(f"Couldn't find any search results for terms {terms_string}")
+        logger.exception(f"Couldn't find any search results for terms {terms_string}")
         terms = []
 
     return terms
@@ -401,7 +391,7 @@ def download_dataset_given_ids(set_ids, dataset, dataset_directory):
         raise ValueError(
             f"Pool type {args.pool_type} is not supported, please use one of {PoolType}"
         )
-    logging.info(f"Using {pool_type} for parallel processing")
+    logger.info(f"Using {pool_type} for parallel processing")
     with tqdm.tqdm(total=len(set_ids), smoothing=0.0) as pbar:
 
         with pool_type(max_workers=args.num_threads) as executor:

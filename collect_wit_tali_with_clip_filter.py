@@ -1,19 +1,17 @@
 import argparse
 import concurrent.futures
 import logging
-import os
 import pathlib
-import random
 import re
-import string
+import shutil
+import sys
 import time
 import urllib.request
 from collections import defaultdict
 from dataclasses import dataclass
-from random import shuffle
 from typing import Any, Dict, List, Optional, Tuple, Union
 
-import numpy as np
+import orjson as json
 import pyarrow as pa
 import pyarrow.parquet as pq
 import pytube
@@ -22,13 +20,12 @@ from datasets import load_dataset
 from rich import print
 from rich.logging import RichHandler
 from rich.traceback import install
-from transformers import CLIPModel
 from yelp_uri.encoding import recode_uri
 
 from clip_helper import get_scores
-from storage import load_dict_from_json, save_dict_in_json
+from utils import convert_keys_to_str, load_text_into_language_time_stamps, save_json
 
-install(show_locals=False, word_wrap=True, width=350, max_frames=1000)
+# install(show_locals=False, word_wrap=True, width=350, max_frames=1000)
 
 FORMAT = "%(message)s"
 logging.basicConfig(
@@ -63,13 +60,16 @@ def get_base_argument_parser():
 
 
 args = get_base_argument_parser()
-
-score_table_folderpath = pathlib.Path(args.target_dataset_dir / "score_table.parquet")
-dataset_table = pathlib.Path(args.target_dataset_dir / "dataset.parquet")
+print("Starting TALI-WIT collection 🦾")
+score_table_folderpath = pathlib.Path(args.target_dataset_dir) / "score_table.parquet"
+dataset_table_folderpath = pathlib.Path(args.target_dataset_dir) / "dataset.parquet"
 
 
 if not score_table_folderpath.exists():
     score_table_folderpath.mkdir(parents=True, exist_ok=True)
+
+if not dataset_table_folderpath.exists():
+    dataset_table_folderpath.mkdir(parents=True, exist_ok=True)
 
 
 class PoolType:
@@ -78,9 +78,10 @@ class PoolType:
 
 
 useful_keys = [
-    # "caption_reference_description",
-    "context_page_description",
-    "hierarchical_section_title",
+    "caption_reference_description",
+    "page_title",
+    # "context_page_description",
+    # "hierarchical_section_title",
 ]
 
 
@@ -118,27 +119,30 @@ class VideoDataOutput:
     embed_url: Optional[str] = None
     video_id: Optional[str] = None
     title: Optional[str] = None
-    captions: Optional[Dict[str]] = None
+    captions: Optional[Dict] = None
     availability: Optional[bool] = None
     length: Optional[int] = None
     age_restricted: Optional[bool] = None
     rating: Optional[float] = None
     views: Optional[int] = None
     author: Optional[str] = None
-    metadata: Optional[Dict] = None
     thumbnail_url: Optional[str] = None
     channel_id: Optional[str] = None
     channel_url: Optional[str] = None
     description: Optional[str] = None
     keywords: Optional[List[str]] = None
     publish_date: Optional[Any] = None
-    vid_info: Optional[Dict] = None
     video_store_filepath: Optional[str] = None
+
+
+@dataclass
+class CaptionDataOutput:
+    captions_dict: Dict
 
 
 def download_video_meta_data_and_youtube_object(
     video_id: str, target_directory: Union[str, pathlib.Path]
-) -> Tuple[VideoDataOutput, pytube.YouTube]:
+) -> Tuple[VideoDataOutput, CaptionDataOutput, pytube.YouTube]:
     video_url = f"https://www.youtube.com/watch?v={video_id}"
     target_directory = (
         pathlib.Path(target_directory)
@@ -148,8 +152,6 @@ def download_video_meta_data_and_youtube_object(
 
     try:
         video_url = f"https://www.youtube.com/watch?v={video_id}"
-
-        target_directory.mkdir(parents=True, exist_ok=True)
 
         youtube_object = pytube.YouTube(video_url)
 
@@ -165,8 +167,9 @@ def download_video_meta_data_and_youtube_object(
         ):
             return None
 
+        caption_dict = load_text_into_language_time_stamps(caption_dict=caption_dict)
+
         metadata_output = VideoDataOutput(
-            captions=caption_dict,
             watch_url=youtube_object.watch_url,
             embed_url=youtube_object.embed_url,
             age_restricted=youtube_object.age_restricted,
@@ -176,7 +179,6 @@ def download_video_meta_data_and_youtube_object(
             length=youtube_object.length,
             views=youtube_object.views,
             author=youtube_object.author,
-            metadata=youtube_object.metadata,
             channel_id=youtube_object.channel_id,
             channel_url=youtube_object.channel_url,
             description=youtube_object.description,
@@ -184,10 +186,11 @@ def download_video_meta_data_and_youtube_object(
             thumbnail_url=youtube_object.thumbnail_url,
             publish_date=youtube_object.publish_date,
             video_id=video_id,
-            vid_info=youtube_object.vid_info,
         )
 
-        return metadata_output, youtube_object
+        captions = CaptionDataOutput(captions_dict=caption_dict)
+
+        return metadata_output, captions, youtube_object
     except Exception:
 
         logging.exception(
@@ -219,7 +222,6 @@ def download_video_and_meta_data(
     resolution_identifier: str,
     sleep_duration: int,
 ) -> VideoDownloaderObject:
-
     target_directory = (
         pathlib.Path(target_directory)
         if isinstance(target_directory, str)
@@ -233,7 +235,7 @@ def download_video_and_meta_data(
     if output is None:
         return VideoDownloaderObject(success=False, video_id=video_id)
     else:
-        metadata_output, youtube_object = output
+        metadata_output, caption_data, youtube_object = output
 
     requested_video_resolution_stream = youtube_object.streams.get_by_resolution(
         resolution=resolution_identifier
@@ -249,64 +251,82 @@ def download_video_and_meta_data(
         return VideoDownloaderObject(success=False, video_id=video_id)
     else:
         video_filepath = target_directory / f"{resolution_identifier}.mp4"
-        if not video_filepath.exists():
-            logging.info(
-                f"Download "
-                f"{resolution_identifier} version of, "
-                f"{video_id},"
-                f"{target_directory.as_posix()}/"
-                f"full_video_{resolution_identifier}.mp4"
+
+        logging.info(
+            f"Download "
+            f"{resolution_identifier} version of, "
+            f"{video_id},"
+            f"{target_directory.as_posix()}/"
+            f"{resolution_identifier}.mp4"
+        )
+
+        try:
+            if not target_directory.exists():
+                target_directory.mkdir(parents=True, exist_ok=True)
+
+            if not video_filepath.exists():
+                requested_video_resolution_stream.download(
+                    output_path=video_filepath.parent.absolute().as_posix(),
+                    filename=video_filepath.name,
+                    max_retries=1,
+                )
+
+        except Exception:
+            shutil.rmtree(target_directory.as_posix())
+            logging.exception(
+                f"Video {video_id}, {target_directory.as_posix()} has gone boom, "
+                f"will now delete this file"
             )
+            return VideoDownloaderObject(success=False, video_id=video_id)
 
-            requested_video_resolution_stream.download(
-                output_path=video_filepath.parent.absolute().as_posix(),
-                filename=video_filepath.stem,
-                max_retries=1,
-            )
+        metadata_output.video_store_filepath = video_filepath.as_posix()
 
-            metadata_output.video_store_filepath = video_filepath.as_posix()
+        meta_data_table = (
+            dataset_table_folderpath
+            / f"{sort_type.name}/{wit_idx}/{term_idx}/{video_id}/meta.parquet"
+        )
 
-            entry_filepath = (
-                score_table_folderpath
-                / f"{sort_type.name}/{wit_idx}/{term_idx}.parquet"
-            )
+        caption_table = (
+            dataset_table_folderpath
+            / f"{sort_type.name}/{wit_idx}/{term_idx}/{video_id}/captions.json"
+        )
 
-            if not entry_filepath.parent.exists():
-                entry_filepath.parent.mkdir(parents=True, exist_ok=True)
-
+        if not meta_data_table.parent.exists():
+            meta_data_table.parent.mkdir(parents=True, exist_ok=True)
+        try:
             keys = metadata_output.__dict__.keys()
             sorted_keys = sorted(keys)
-            values = [metadata_output.__dict__[key] for key in sorted_keys]
+
+            combined_values = [
+                [wit_idx],
+                [term_idx],
+                [sort_type.name],
+            ] + [[metadata_output.__dict__[key]] for key in sorted_keys]
+
+            combined_keys = [
+                "wit_idx",
+                "term_idx",
+                "sort_type",
+            ] + sorted_keys
 
             table_entry = pa.table(
-                [
-                    [wit_idx],
-                    [term_idx],
-                    [sort_type.name],
-                ]
-                + values,
-                names=[
-                    "wit_idx",
-                    "term_idx",
-                    "sort_type",
-                ]
-                + sorted_keys,
+                combined_values,
+                names=combined_keys,
             )
 
-            table = table_entry
+            pq.write_table(table_entry, meta_data_table)
 
-            pq.write_table(table, entry_filepath)
+            captions_dict = convert_keys_to_str(caption_data.captions_dict)
+            save_json(filepath=caption_table, target_dict=captions_dict)
 
-        else:
-            logging.info(
-                f"Skipping "
-                f"{resolution_identifier} version of, "
-                f"{video_id}, as it already exists in "
-                f"{video_filepath.as_posix()}"
+            time.sleep(sleep_duration)
+            logging.info(f"Sleeping for {sleep_duration} seconds..")
+        except Exception:
+            logging.exception(
+                f"Video {video_id}, {target_directory.as_posix()} has gone boom, "
+                f"will now delete this file. Exception was {sys.exc_info()[0]}"
             )
-
-        time.sleep(sleep_duration)
-        logging.info(f"Sleeping for {sleep_duration} seconds..")
+            return VideoDownloaderObject(success=False, video_id=video_id)
 
     return VideoDownloaderObject(success=True, video_id=video_id)
 
@@ -315,18 +335,6 @@ def download_video_and_meta_data(
 class DownloadLength:
     video_id: str
     length: int
-
-
-def download_length(video_id: str):
-    url = f"https://www.youtube.com/watch?v={video_id}"
-
-    try:
-        youtube_object = pytube.YouTube(url)
-        length = youtube_object.length
-        return DownloadLength(video_id=video_id, length=length)
-    except Exception:
-        logging.exception(f"Couldn't get length for {url}")
-        return DownloadLength(video_id=video_id, length=0)
 
 
 @dataclass
@@ -367,16 +375,12 @@ def extract_terms_dict_from_sample(sample: Dict) -> Dict[str, list]:
     else:
         output_dict = dict()
 
-    if sample["caption_attribution_description"] is not None:
-        bits = sample["caption_attribution_description"].split(":")
-        output_dict["caption"] = ":".join(bits[1:])
+    for key, value in output_dict.items():
+        if value is not None:
+            terms = re.findall("[A-Z][^A-Z]*", value)
 
-        for key, value in output_dict.items():
-            if value is not None:
-                terms = re.findall("[A-Z][^A-Z]*", value)
-
-                term_string = "+".join(terms)
-                term_dict[key].append(term_string)
+            term_string = "+".join(terms)
+            term_dict[key].append(term_string)
 
     return term_dict
 
@@ -431,7 +435,7 @@ def filter_video_ids_with_clip(
         )
 
         if output is not None:
-            video_dict, youtube_object = output
+            video_dict, captions_dict, youtube_object = output
             titles.append(youtube_object.title)
             valid_video_ids_related_to_term.append(video_id)
 
@@ -506,6 +510,7 @@ def download_video_meta_data_given_sample(
                 sort_type=sort_type,
             )
             term_related_video_ids = list(set(term_related_video_ids))
+
             term_related_video_ids = filter_video_ids_with_clip(
                 reference_term=term_values,
                 term_related_video_ids=term_related_video_ids,
@@ -514,29 +519,20 @@ def download_video_meta_data_given_sample(
                 term_idx=term_idx,
                 sort_type=sort_type,
             )
+
             for video_id in term_related_video_ids:
-                video_directory_path = target_directory / str(wit_idx)
-                if video_directory_path.exists():
-                    video_files_found = list(video_directory_path.rglob("*.mp4"))
+                video_directory_path = target_directory / str(wit_idx) / str(video_id)
 
-                    if len(video_files_found) > 0:
-                        return outputs
-
-                directory_path = video_directory_path / str(video_id)
-
-                if not directory_path.exists():
-                    directory_path.mkdir(parents=True, exist_ok=True)
-
-                    output = download_video_and_meta_data(
-                        video_id=video_id,
-                        term_idx=term_idx,
-                        wit_idx=wit_idx,
-                        sort_type=sort_type,
-                        target_directory=directory_path,
-                        resolution_identifier=args.resolution_identifier,
-                        sleep_duration=args.sleep_duration,
-                    )
-                    outputs.append(output)
+                output = download_video_and_meta_data(
+                    video_id=video_id,
+                    term_idx=term_idx,
+                    wit_idx=wit_idx,
+                    sort_type=sort_type,
+                    target_directory=video_directory_path,
+                    resolution_identifier=args.resolution_identifier,
+                    sleep_duration=args.sleep_duration,
+                )
+                outputs.append(output)
     return outputs
 
 
@@ -557,7 +553,7 @@ def download_dataset_given_ids(
         dict(
             sample=dataset[wit_idx],
             wit_idx=wit_idx,
-            dataset_directory=target_directory,
+            target_directory=target_directory,
         )
         for wit_idx in set_ids
     ]
@@ -585,10 +581,11 @@ def download_dataset_given_ids(
             ):
 
                 pbar.update(1)
-                pbar.set_description(f"Downloading video {outputs_list}")
+                pbar.set_description(f"Downloaded videos with ids {outputs_list}")
 
 
 if __name__ == "__main__":
+    print("Loading WIT dataset 👨🏻‍💻")
     dataset = load_dataset(
         "wikimedia/wit_base", split="train", cache_dir=args.wit_cache_dir
     )
@@ -599,16 +596,16 @@ if __name__ == "__main__":
 
     id_buckets = []
     num_buckets = (len(dataset_ids) // args.samples_per_bucket) + 1
-
+    print("Splitting dataset into buckets 🪣")
     for i in range(num_buckets):
         id_buckets.append(
             dataset_ids[i * args.samples_per_bucket : (i + 1) * args.samples_per_bucket]
         )
 
     set_ids = dataset_ids
-    dataset_directory = pathlib.Path(args.target_dataset_dir / "all")
+    dataset_directory = pathlib.Path(args.target_dataset_dir) / "all"
     dataset_directory.mkdir(parents=True, exist_ok=True)
-
+    print("Beginning scraping 📔")
     with tqdm.tqdm(total=num_buckets, smoothing=0.0) as pbar:
         for id_bucket in id_buckets:
             download_dataset_given_ids(

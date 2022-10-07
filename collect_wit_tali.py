@@ -4,7 +4,6 @@ import logging
 import os
 import pathlib
 import re
-import string
 import time
 import urllib.request
 from collections import defaultdict

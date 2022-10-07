@@ -1,6 +1,6 @@
 # -------------------------------------------
 # This script installs all the dependencies need to use tali-collector
-mamba install numpy transformers tqdm rich pytube datasets Pillow -y
+mamba install numpy transformers tqdm rich pytube datasets Pillow orjson -y
 mamba install pytorch torchvision torchaudio -c pytorch -c conda-forge -y
 yes | pip install yelp_uri clip
 

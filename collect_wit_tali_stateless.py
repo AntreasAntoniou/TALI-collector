@@ -3,24 +3,19 @@ import concurrent.futures
 import logging
 import os
 import pathlib
-import random
 import re
-import string
 import time
 import urllib.request
 from collections import defaultdict
-from random import shuffle
 from typing import Dict
 
-import numpy as np
 import pytube
 import tqdm
 from datasets import load_dataset
-from rich import print
 from rich.logging import RichHandler
 from yelp_uri.encoding import recode_uri
 
-from storage import load_dict_from_json, save_dict_in_json
+from storage import save_dict_in_json
 
 FORMAT = "%(message)s"
 logging.basicConfig(
