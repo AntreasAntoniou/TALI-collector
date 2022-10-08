@@ -13,7 +13,8 @@ SHELL ["conda", "run", "-n", "tali-collector", "/bin/bash", "-c"]
 RUN cd TALI-collector \
     && conda install -c conda-forge mamba -y \
     && mamba install pytorch torchvision torchaudio -c pytorch -c conda-forge \
-    && bash install_dependencies.sh
+    && bash install_dependencies.sh \
+    && yes | pip install transformers -U
 
 
 RUN cd TALI-collector \
