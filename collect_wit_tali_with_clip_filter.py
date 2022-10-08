@@ -190,10 +190,10 @@ def download_video_meta_data_and_youtube_object(
         return metadata_output, captions, youtube_object
     except Exception:
 
-        # logging.exception(
-        #     f"Video {video_url}, {target_directory.as_posix()} has gone boom, "
-        #     f"will now delete this file"
-        # )
+        logging.exception(
+            f"Video {video_id}, {target_directory.as_posix()} has gone boom, "
+            f"will now delete this file"
+        )
 
         return None
 
