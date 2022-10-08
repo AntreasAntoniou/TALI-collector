@@ -22,4 +22,4 @@ RUN cd TALI-collector \
 
 WORKDIR /TALI-collector
 
-CMD ["/bin/bash"]
+ENTRYPOINT ["/bin/bash"]
