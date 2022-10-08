@@ -6,12 +6,6 @@ RUN apt update && apt install -y \
     git \
     wget \
     unzip \
-    vim \
-    libgl1-mesa-glx \
-    libglib2.0-0 \
-    libsm6 \
-    libxext6 \
-    libxrender-dev \
     fish
 
 RUN conda init bash
