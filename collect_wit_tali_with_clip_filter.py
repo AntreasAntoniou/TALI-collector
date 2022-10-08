@@ -2,6 +2,7 @@ import argparse
 import concurrent.futures
 import logging
 import pathlib
+import random
 import re
 import shutil
 import sys
@@ -238,23 +239,23 @@ def download_video_and_meta_data(
     )
 
     if requested_video_resolution_stream is None:
-        # logging.info(
-        #     f"Can't find "
-        #     f"{resolution_identifier} version of, "
-        #     f"{video_id},"
-        #     f"{youtube_object.streams}"
-        # )
+        logging.info(
+            f"Can't find "
+            f"{resolution_identifier} version of, "
+            f"{video_id},"
+            f"{youtube_object.streams}"
+        )
         return VideoDownloaderObject(success=False, video_id=video_id)
     else:
         video_filepath = target_directory / f"{resolution_identifier}.mp4"
 
-        # logging.info(
-        #     f"Download "
-        #     f"{resolution_identifier} version of, "
-        #     f"{video_id},"
-        #     f"{target_directory.as_posix()}/"
-        #     f"{resolution_identifier}.mp4"
-        # )
+        logging.info(
+            f"Download "
+            f"{resolution_identifier} version of, "
+            f"{video_id},"
+            f"{target_directory.as_posix()}/"
+            f"{resolution_identifier}.mp4"
+        )
 
         try:
             if not target_directory.exists():
@@ -269,10 +270,10 @@ def download_video_and_meta_data(
 
         except Exception:
             shutil.rmtree(target_directory.as_posix())
-            # logging.exception(
-            #     f"Video {video_id}, {target_directory.as_posix()} has gone boom, "
-            #     f"will now delete this file"
-            # )
+            logging.exception(
+                f"Video {video_id}, {target_directory.as_posix()} has gone boom, "
+                f"will now delete this file"
+            )
             return VideoDownloaderObject(success=False, video_id=video_id)
 
         metadata_output.video_store_filepath = video_filepath.as_posix()
@@ -318,10 +319,10 @@ def download_video_and_meta_data(
             time.sleep(sleep_duration)
             # logging.info(f" for {sleep_duration} seconds..")
         except Exception:
-            # logging.exception(
-            #     f"Video {video_id}, {target_directory.as_posix()} has gone boom, "
-            #     f"will now delete this file. Exception was {sys.exc_info()[0]}"
-            # )
+            logging.exception(
+                f"Video {video_id}, {target_directory.as_posix()} has gone boom, "
+                f"will now delete this file. Exception was {sys.exc_info()[0]}"
+            )
             return VideoDownloaderObject(success=False, video_id=video_id)
 
     return VideoDownloaderObject(success=True, video_id=video_id)
@@ -353,7 +354,7 @@ def search_for_video_ids(
 
         terms = re.findall(pattern=r"watch\?v=(\S{11})", string=html)[:n]
     except Exception:
-        # logging.exception(f"Couldn't find any search results for terms {terms_string}")
+        logging.exception(f"Couldn't find any search results for terms {terms_string}")
         terms = []
 
     return terms
@@ -568,7 +569,7 @@ def download_dataset_given_ids(
         raise ValueError(
             f"Pool type {args.pool_type} is not supported, please use one of {PoolType}"
         )
-    # logging.info(f"Using {pool_type} for parallel processing")
+    logging.info(f"Using {pool_type} for parallel processing")
     with tqdm.tqdm(total=len(set_ids), smoothing=0.0) as pbar:
 
         with pool_type(max_workers=args.num_threads) as executor:
@@ -588,7 +589,6 @@ if __name__ == "__main__":
     dataset = load_dataset(
         "wikimedia/wit_base", split="train", cache_dir=args.wit_cache_dir
     )
-    # random.seed(args.seed)
     dataset_ids = [
         i for i in range(args.starting_sample_idx, args.ending_sample_idx, 1)
     ]
