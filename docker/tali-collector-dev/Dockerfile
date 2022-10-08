@@ -4,6 +4,9 @@ SHELL ["/bin/bash", "-c"]
 
 RUN apt update
 RUN apt install fish -y
+RUN apt install micro bat git tmux fish -y
+RUN curl -sS https://starship.rs/install.sh | sh
+
 
 RUN conda init bash
 RUN conda create -n tali-collector python=3.10 -y
@@ -25,10 +28,6 @@ RUN cd TALI-collector \
 
 
 ADD entrypoint.sh /entrypoint.sh
-
-RUN apt install micro bat git tmux fish
-RUN curl -sS https://starship.rs/install.sh | sh
-
 
 
 RUN mkdir -p /root/.config/fish/
