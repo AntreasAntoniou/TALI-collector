@@ -4,8 +4,7 @@ SHELL ["/bin/bash", "-c"]
 
 RUN apt update
 RUN apt install fish -y
-RUN apt install micro bat git tmux fish -y
-RUN curl -sS https://starship.rs/install.sh | sh
+RUN apt install micro bat git tmux fish curl -y
 
 
 RUN conda init bash
@@ -19,6 +18,7 @@ SHELL ["conda", "run", "-n", "tali-collector", "/bin/bash", "-c"]
 RUN cd TALI-collector \
     && conda install -c conda-forge mamba -y \
     && mamba install pytorch torchvision torchaudio -c pytorch -c conda-forge \
+    && mamba install starship -y \
     && bash install_dependencies.sh \
     && yes | pip install transformers -U
 
