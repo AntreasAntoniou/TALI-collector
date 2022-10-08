@@ -2,6 +2,18 @@ FROM gcr.io/deeplearning-platform-release/pytorch-cpu.1-4:latest
 
 SHELL ["/bin/bash", "-c"]
 
+RUN apt update && apt install -y \
+    git \
+    wget \
+    unzip \
+    vim \
+    libgl1-mesa-glx \
+    libglib2.0-0 \
+    libsm6 \
+    libxext6 \
+    libxrender-dev \
+    fish
+
 RUN conda init bash
 RUN conda create -n tali-collector python=3.10 -y
 RUN echo "conda activate tali-collector" >> ~/.bashrc
