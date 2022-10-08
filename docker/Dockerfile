@@ -24,5 +24,11 @@ RUN cd TALI-collector \
     && git pull
 
 WORKDIR /TALI-collector
+ADD entrypoint.sh /entrypoint.sh
+ENTRYPOINT ["/bin/bash", "/entrypoint.sh"]
 
-ENTRYPOINT ["/bin/bash", "entrypoint.sh"]
+# The Dockerfile is pretty straightforward. It starts with the base image,
+# which is the mambaforge image. Then, it installs fish and creates a conda environment.
+# It clones the TALI-collector repository and installs the dependencies.
+# Finally, it sets the working directory to the TALI-collector repository and sets the
+# entrypoint to the entrypoint.sh script.
