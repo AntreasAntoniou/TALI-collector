@@ -2,7 +2,8 @@ FROM gcr.io/deeplearning-platform-release/pytorch-cpu.1-4:latest
 
 SHELL ["/bin/bash", "-c"]
 
-RUN apt update && apt install fish -y
+RUN apt update
+RUN apt install fish -y
 
 RUN conda init bash
 RUN conda create -n tali-collector python=3.10 -y
