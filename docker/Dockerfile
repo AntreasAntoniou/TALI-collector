@@ -23,6 +23,10 @@ RUN cd TALI-collector \
 RUN cd TALI-collector \
     && git pull
 
+RUN pwd
+ADD docker/entrypoint.sh /entrypoint.sh
+
+
 WORKDIR /TALI-collector
 ADD docker/entrypoint.sh /entrypoint.sh
 ENTRYPOINT ["/bin/bash", "/entrypoint.sh"]
