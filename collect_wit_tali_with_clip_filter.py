@@ -40,7 +40,7 @@ logging = logging.getLogger("rich")
 def get_base_argument_parser():
     parser = argparse.ArgumentParser()
 
-    parser.add_argument("--num_threads", type=int, default=8)
+    parser.add_argument("--num_workers", type=int, default=8)
     parser.add_argument("--seed", type=int, default=23061991)
     parser.add_argument("--total_downloads_per_query", type=int, default=1)
     parser.add_argument("--total_results_per_query", type=int, default=100)
@@ -486,8 +486,12 @@ def filter_video_ids_with_clip(
 
 
 def download_video_meta_data_given_sample(
-    sample: Dict, wit_idx: int, target_directory: Union[str, pathlib.Path]
+    sample: Dict,
+    wit_idx: int,
+    target_directory: Union[str, pathlib.Path],
+    sleep_seed: int,
 ):
+    time.sleep(sleep_seed * args.sleep_duration)
     try:
         target_directory = (
             pathlib.Path(target_directory)
@@ -556,8 +560,9 @@ def download_dataset_given_ids(
             sample=dataset[wit_idx],
             wit_idx=wit_idx,
             target_directory=target_directory,
+            sleep_seed=idx % args.num_workers,
         )
-        for wit_idx in set_ids
+        for idx, wit_idx in enumerate(set_ids)
     ]
     pool_type = (
         concurrent.futures.ProcessPoolExecutor
@@ -574,7 +579,7 @@ def download_dataset_given_ids(
     logging.info(f"Using {pool_type} for parallel processing")
     with tqdm.tqdm(total=len(set_ids), smoothing=0.0) as pbar:
 
-        with pool_type(max_workers=args.num_threads) as executor:
+        with pool_type(max_workers=args.num_workers) as executor:
             for video_idx, outputs_list in enumerate(
                 executor.map(
                     download_video_meta_data_given_sample_wrapper, arg_dict_list
