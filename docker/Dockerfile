@@ -26,7 +26,7 @@ RUN cd TALI-collector \
 
 ADD entrypoint.sh /entrypoint.sh
 
-RUN touch /root/.config/fish/config.fish
+RUN echo '' > /root/.config/fish/config.fish
 RUN echo "starship init fish | source" >> ~/.config/fish/config.fish
 RUN  echo 'eval "$(starship init bash)"' >> ~/.bashrc
 
