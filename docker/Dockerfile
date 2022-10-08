@@ -34,4 +34,6 @@ RUN cd TALI-collector \
 
 WORKDIR /TALI-collector
 
+CMD ["conda", "run", "-n", "tali-collector", "/bin/bash", "-c", "git pull"]
+
 ENTRYPOINT ["/bin/bash"]
