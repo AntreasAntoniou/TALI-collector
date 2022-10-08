@@ -491,54 +491,49 @@ def download_video_meta_data_given_sample(
     target_directory: Union[str, pathlib.Path],
     sleep_seed: int,
 ):
+    outputs = []
     time.sleep(sleep_seed * args.sleep_duration)
-    try:
-        target_directory = (
-            pathlib.Path(target_directory)
-            if isinstance(target_directory, str)
-            else target_directory
-        )
-        outputs = []
-        search_term_dict = extract_terms_dict_from_sample(sample=sample)
-        target_directory = pathlib.Path(target_directory)
-        for term_idx, (term_name, term_values) in enumerate(search_term_dict.items()):
-            for sort_type in [
-                SortKeyStringToCode.relevance,
-            ]:
-                term_related_video_ids = search_for_video_ids(
-                    terms_string=term_values,
-                    n=args.total_results_per_query,
-                    sort_type=sort_type,
-                )
-                term_related_video_ids = list(set(term_related_video_ids))
+    target_directory = (
+        pathlib.Path(target_directory)
+        if isinstance(target_directory, str)
+        else target_directory
+    )
 
-                term_related_video_ids = filter_video_ids_with_clip(
-                    reference_term=term_values,
-                    term_related_video_ids=term_related_video_ids,
-                    target_directory=target_directory,
-                    wit_idx=wit_idx,
+    search_term_dict = extract_terms_dict_from_sample(sample=sample)
+    target_directory = pathlib.Path(target_directory)
+    for term_idx, (term_name, term_values) in enumerate(search_term_dict.items()):
+        for sort_type in [
+            SortKeyStringToCode.relevance,
+        ]:
+            term_related_video_ids = search_for_video_ids(
+                terms_string=term_values,
+                n=args.total_results_per_query,
+                sort_type=sort_type,
+            )
+            term_related_video_ids = list(set(term_related_video_ids))
+
+            term_related_video_ids = filter_video_ids_with_clip(
+                reference_term=term_values,
+                term_related_video_ids=term_related_video_ids,
+                target_directory=target_directory,
+                wit_idx=wit_idx,
+                term_idx=term_idx,
+                sort_type=sort_type,
+            )
+
+            for video_id in term_related_video_ids:
+                video_directory_path = target_directory / str(wit_idx) / str(video_id)
+
+                output = download_video_and_meta_data(
+                    video_id=video_id,
                     term_idx=term_idx,
+                    wit_idx=wit_idx,
                     sort_type=sort_type,
+                    target_directory=video_directory_path,
+                    resolution_identifier=args.resolution_identifier,
+                    sleep_duration=args.sleep_duration,
                 )
-
-                for video_id in term_related_video_ids:
-                    video_directory_path = (
-                        target_directory / str(wit_idx) / str(video_id)
-                    )
-
-                    output = download_video_and_meta_data(
-                        video_id=video_id,
-                        term_idx=term_idx,
-                        wit_idx=wit_idx,
-                        sort_type=sort_type,
-                        target_directory=video_directory_path,
-                        resolution_identifier=args.resolution_identifier,
-                        sleep_duration=args.sleep_duration,
-                    )
-                    outputs.append(output)
-    except Exception:
-        outputs = []
-        logging.exception("Error in download_video_meta_data_given_sample")
+                outputs.append(output)
     return outputs
 
 
