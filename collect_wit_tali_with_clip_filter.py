@@ -224,7 +224,7 @@ def download_video_and_meta_data(
         if isinstance(target_directory, str)
         else target_directory
     )
-    time.sleep(args.sleep_duration)
+    time.sleep(args.sleep_duration + random.random() * 2)
     output = download_video_meta_data_and_youtube_object(
         video_id=video_id, target_directory=target_directory
     )
@@ -316,7 +316,7 @@ def download_video_and_meta_data(
             captions_dict = convert_keys_to_str(caption_data.captions_dict)
             save_json(filepath=caption_table, target_dict=captions_dict)
 
-            time.sleep(sleep_duration)
+            time.sleep(args.sleep_duration + random.random() * 2)
             # logging.info(f" for {sleep_duration} seconds..")
         except Exception:
             logging.exception(
@@ -344,7 +344,7 @@ def search_for_video_ids(
     terms_string: str, sort_type: SortType, n: int = 100
 ) -> List[str]:
 
-    time.sleep(args.sleep_duration)
+    time.sleep(args.sleep_duration + random.random() * 2)
     try:
         url = f"https://www.youtube.com/results?search_query={terms_string}"
         f"&sp={sort_type.youtube_code}"
@@ -427,7 +427,7 @@ def filter_video_ids_with_clip(
     for video_id in term_related_video_ids:
         video_directory_path = directory_path / video_id
 
-        time.sleep(args.sleep_duration)
+        time.sleep(args.sleep_duration + random.random() * 2)
 
         output = download_video_meta_data_and_youtube_object(
             video_id=video_id, target_directory=video_directory_path
@@ -495,7 +495,7 @@ def download_video_meta_data_given_sample(
     sleep_seed: int,
 ):
     outputs = []
-    time.sleep(sleep_seed * args.sleep_duration)
+    time.sleep(sleep_seed * args.sleep_duration + random.random() * 2)
     target_directory = (
         pathlib.Path(target_directory)
         if isinstance(target_directory, str)
