@@ -24,7 +24,7 @@ RUN cd TALI-collector \
     && git pull
 
 WORKDIR /TALI-collector
-ADD entrypoint.sh /entrypoint.sh
+ADD docker/entrypoint.sh /entrypoint.sh
 ENTRYPOINT ["/bin/bash", "/entrypoint.sh"]
 
 # The Dockerfile is pretty straightforward. It starts with the base image,
