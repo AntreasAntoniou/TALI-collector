@@ -1,4 +1,4 @@
-FROM gcr.io/deeplearning-platform-release/pytorch-cpu.1-4:latest
+FROM condaforge/mambaforge:latest
 
 SHELL ["/bin/bash", "-c"]
 
