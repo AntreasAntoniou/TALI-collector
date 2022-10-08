@@ -480,7 +480,7 @@ def filter_video_ids_with_clip(
 
             pq.write_table(table, entry_filepath)
 
-            return clip_scores.sorted_query_ids[: args.total_downloads_per_query]
+            return clip_scores.sorted_query_ids
 
     return []
 
@@ -525,7 +525,7 @@ def download_video_meta_data_given_sample(
                 term_idx=term_idx,
                 sort_type=sort_type,
             )
-
+            num_succesful_downloads = 0
             for video_id in term_related_video_ids:
                 video_directory_path = target_directory / str(wit_idx) / str(video_id)
 
@@ -539,6 +539,9 @@ def download_video_meta_data_given_sample(
                     sleep_duration=args.sleep_duration,
                 )
                 outputs.append(output)
+                num_succesful_downloads += 1
+                if num_succesful_downloads >= args.total_downloads_per_query:
+                    break
     return outputs
 
 
