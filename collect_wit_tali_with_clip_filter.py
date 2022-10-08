@@ -499,8 +499,13 @@ def download_video_meta_data_given_sample(
         else target_directory
     )
 
+    idx_directory = target_directory / str(wit_idx)
+    existing_video_files = list(idx_directory.rglob("*.mp4"))
+
+    if len(existing_video_files) > 0:
+        return existing_video_files
+
     search_term_dict = extract_terms_dict_from_sample(sample=sample)
-    target_directory = pathlib.Path(target_directory)
     for term_idx, (term_name, term_values) in enumerate(search_term_dict.items()):
         for sort_type in [
             SortKeyStringToCode.relevance,
