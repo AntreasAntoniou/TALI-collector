@@ -224,10 +224,10 @@ def download_video_and_meta_data(
         if isinstance(target_directory, str)
         else target_directory
     )
-    seed = (
-        f"{video_id}{term_idx}{wit_idx}{resolution_identifier}{sort_type.youtube_code}"
+    seed = f"{video_id}{term_idx}{wit_idx}{resolution_identifier}{sort_type.youtube_code}"
+    random.seed(
+        seed
     )
-    random.seed(seed)
     time.sleep(args.sleep_duration + random.random() * 2)
     output = download_video_meta_data_and_youtube_object(
         video_id=video_id, target_directory=target_directory
@@ -347,8 +347,7 @@ class SortKeyStringToCode:
 def search_for_video_ids(
     terms_string: str, sort_type: SortType, n: int = 100
 ) -> List[str]:
-    seed = f"{terms_string}{sort_type.youtube_code}"
-    random.seed(seed)
+
     time.sleep(args.sleep_duration + random.random() * 2)
     try:
         url = f"https://www.youtube.com/results?search_query={terms_string}"
@@ -431,8 +430,7 @@ def filter_video_ids_with_clip(
 
     for video_id in term_related_video_ids:
         video_directory_path = directory_path / video_id
-        seed = f"{wit_idx}{term_idx}{reference_term}{sort_type.youtube_code}"
-        random.seed(seed)
+
         time.sleep(args.sleep_duration + random.random() * 2)
 
         output = download_video_meta_data_and_youtube_object(
@@ -501,8 +499,6 @@ def download_video_meta_data_given_sample(
     sleep_seed: int,
 ):
     outputs = []
-    seed = f"{wit_idx}{sleep_seed}{wit_idx}"
-    random.seed(seed)
     time.sleep(sleep_seed * args.sleep_duration + random.random() * 2)
     target_directory = (
         pathlib.Path(target_directory)
