@@ -3,7 +3,6 @@ FROM condaforge/mambaforge:latest
 SHELL ["/bin/bash", "-c"]
 
 RUN apt update
-RUN apt install fish -y
 RUN apt install micro bat git tmux fish curl -y
 
 
