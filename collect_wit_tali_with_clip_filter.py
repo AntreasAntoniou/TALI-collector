@@ -224,10 +224,10 @@ def download_video_and_meta_data(
         if isinstance(target_directory, str)
         else target_directory
     )
-    seed = f"{video_id}{term_idx}{wit_idx}{resolution_identifier}{sort_type.youtube_code}"
-    random.seed(
-        seed
+    seed = (
+        f"{video_id}{term_idx}{wit_idx}{resolution_identifier}{sort_type.youtube_code}"
     )
+    random.seed(seed)
     time.sleep(args.sleep_duration + random.random() * 2)
     output = download_video_meta_data_and_youtube_object(
         video_id=video_id, target_directory=target_directory
@@ -553,7 +553,10 @@ def download_video_meta_data_given_sample(
 
 
 def download_video_meta_data_given_sample_wrapper(args_dict):
-    return download_video_meta_data_given_sample(**args_dict)
+    try:
+        return download_video_meta_data_given_sample(**args_dict)
+    except Exception:
+        logging.exception(f"Error in download_video_meta_data_given_sample_wrapper 💥")
 
 
 def download_dataset_given_ids(
