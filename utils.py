@@ -19,6 +19,9 @@ def get_logger():
     return logger
 
 
+logger = get_logger()
+
+
 def save_json(
     filepath: Union[str, pathlib.Path],
     target_dict: Dict[str, str],
@@ -133,7 +136,7 @@ def get_text_tokens(caption_dict, start_timestamp, end_timestamp):
 
     if not timestamp_to_caption_dict:
         if logger.getEffectiveLevel() == logging.DEBUG:
-            logger.exception(f"No captions found for {meta_data_filepath}")
+            logger.exception(f"No captions found for {caption_dict}")
         return None
 
     temp_timestamp_to_caption_dict = {}
@@ -149,28 +152,3 @@ def get_text_tokens(caption_dict, start_timestamp, end_timestamp):
             break
 
     return temp_timestamp_to_caption_dict
-
-
-def get_text_data_tensors(
-    meta_data_filepath,
-    start_time_relative_to_full_video,
-    duration_in_seconds,
-):
-    text = get_text_tokens(
-        meta_data_filepath=meta_data_filepath,
-        start_timestamp=start_time_relative_to_full_video,
-        end_timestamp=start_time_relative_to_full_video + duration_in_seconds,
-    )
-
-    if not text:
-        text = "No detected speech"
-    else:
-        text = [
-            value.split(" ") if isinstance(value, str) else value
-            for key, value in text.items()
-        ]
-        text = list(itertools.chain.from_iterable(text))
-        text = [token.replace(" ", "") for token in text]
-        text = " ".join(text) if len(text) > 1 else text
-
-    return text

@@ -17,8 +17,9 @@ import orjson as json
 import pyarrow as pa
 import pyarrow.parquet as pq
 import pytube
+from responses import target
 import tqdm
-from datasets import load_dataset
+import datasets
 from rich import print
 from rich.logging import RichHandler
 from rich.traceback import install
@@ -100,7 +101,7 @@ class TargetLanguageOutput:
 
 def get_language_specific_wikipedia_data(
     sample: Dict, target_language: str = "en"
-) -> TargetLanguageOutput:
+) -> Optional[TargetLanguageOutput]:
     multi_lingual_wikipedia_data = sample["wit_features"]
 
     if target_language in multi_lingual_wikipedia_data["language"]:
@@ -147,7 +148,10 @@ class CaptionDataOutput:
 
 def download_video_meta_data_and_youtube_object(
     video_id: str, target_directory: Union[str, pathlib.Path]
-) -> Tuple[VideoDataOutput, CaptionDataOutput, pytube.YouTube]:
+) -> Optional[Tuple[VideoDataOutput, CaptionDataOutput, pytube.YouTube]]:
+
+    if isinstance(target_directory, str):
+        target_directory = pathlib.Path(target_directory)
 
     try:
         video_url = f"https://www.youtube.com/watch?v={video_id}"
@@ -606,7 +610,7 @@ def download_dataset_given_ids(
 
 if __name__ == "__main__":
     print("Loading WIT dataset 👨🏻‍💻")
-    dataset = load_dataset(
+    dataset = datasets.load_dataset(
         "wikimedia/wit_base", split="train", cache_dir=args.wit_cache_dir
     )
     dataset_ids = [
