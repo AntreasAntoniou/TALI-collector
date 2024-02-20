@@ -13,7 +13,8 @@ from typing import Any, Dict, List, Optional, Tuple, Union
 
 import fire
 import pytube
-import rich
+import yaml
+from rich import print
 from rich.logging import RichHandler
 from rich.traceback import install
 from tqdm.auto import tqdm
@@ -29,7 +30,10 @@ install()
 
 FORMAT = "%(message)s"
 logging.basicConfig(
-    level=logging.INFO, format=FORMAT, datefmt="[%X]", handlers=[RichHandler()]
+    level=logging.DEBUG,
+    format=FORMAT,
+    datefmt="[%X]",
+    handlers=[RichHandler()],
 )
 
 logging = logging.getLogger("rich")
@@ -107,65 +111,54 @@ class SortKeyStringToCode:
     view_counts = SortType(name="view_counts", youtube_code="CAMSAjAB")
 
 
-def download_video_meta_data_and_youtube_object(
-    video_id: str, target_directory: Union[str, pathlib.Path]
+def fetch_video_meta_data_and_youtube_object(
+    video_id: str,
 ) -> Optional[Tuple[VideoDataOutput, CaptionDataOutput, pytube.YouTube]]:
 
-    if isinstance(target_directory, str):
-        target_directory = pathlib.Path(target_directory)
+    video_url = f"https://www.youtube.com/watch?v={video_id}"
 
-    try:
-        video_url = f"https://www.youtube.com/watch?v={video_id}"
+    youtube_object = pytube.YouTube(video_url)
+    youtube_object.streams.all()
 
-        youtube_object = pytube.YouTube(video_url)
+    caption_dict = dict()
 
-        caption_dict = dict()
+    for caption_item in youtube_object.captions:
+        caption_dict[f"{caption_item.code}"] = caption_item.xml_captions
 
-        for caption_item in youtube_object.captions:
-            caption_dict[f"{caption_item.code}"] = caption_item.xml_captions
+    if (
+        youtube_object.age_restricted is True
+        or "en" not in caption_dict
+        and "a.en" not in caption_dict
+    ):
 
-        if (
-            youtube_object.age_restricted is True
-            or "en" not in caption_dict
-            and "a.en" not in caption_dict
-        ):
-            return None
-
-        caption_dict = load_text_into_language_time_stamps(
-            caption_dict=caption_dict
+        raise Exception(
+            f"Video {video_id} is age restricted or has no captions"
         )
 
-        metadata_output = VideoDataOutput(
-            watch_url=youtube_object.watch_url,
-            embed_url=youtube_object.embed_url,
-            age_restricted=youtube_object.age_restricted,
-            title=youtube_object.title,
-            length=youtube_object.length,
-            views=youtube_object.views,
-            author=youtube_object.author,
-            channel_id=youtube_object.channel_id,
-            channel_url=youtube_object.channel_url,
-            description=youtube_object.description,
-            keywords=youtube_object.keywords,
-            thumbnail_url=youtube_object.thumbnail_url,
-            publish_date=youtube_object.publish_date,
-            video_id=video_id,
-        )
+    caption_dict = load_text_into_language_time_stamps(
+        caption_dict=caption_dict
+    )
 
-        captions = CaptionDataOutput(captions_dict=caption_dict)
+    metadata_output = VideoDataOutput(
+        watch_url=youtube_object.watch_url,
+        embed_url=youtube_object.embed_url,
+        age_restricted=youtube_object.age_restricted,
+        title=youtube_object.title,
+        length=youtube_object.length,
+        views=youtube_object.views,
+        author=youtube_object.author,
+        channel_id=youtube_object.channel_id,
+        channel_url=youtube_object.channel_url,
+        description=youtube_object.description,
+        keywords=youtube_object.keywords,
+        thumbnail_url=youtube_object.thumbnail_url,
+        publish_date=youtube_object.publish_date,
+        video_id=video_id,
+    )
 
-        return metadata_output, captions, youtube_object
-    except Exception:
+    captions = CaptionDataOutput(captions_dict=caption_dict)
 
-        logging.exception(
-            f"Video {video_id}, {target_directory.as_posix()} has gone boom, "
-            f"will now delete this file"
-        )
-
-        return None
-
-
-import yaml
+    return metadata_output, captions, youtube_object
 
 
 def download_video_and_meta_data(
@@ -180,9 +173,7 @@ def download_video_and_meta_data(
         else target_directory
     )
     time.sleep(sleep_duration)
-    output = download_video_meta_data_and_youtube_object(
-        video_id=video_id, target_directory=target_directory
-    )
+    output = fetch_video_meta_data_and_youtube_object(video_id=video_id)
 
     if output is None:
         return VideoDownloaderObject(success=False, video_id=video_id)
@@ -229,10 +220,10 @@ def download_video_and_meta_data(
 
         except Exception:
             shutil.rmtree(target_directory.as_posix())
-            logging.exception(
-                f"Video {video_id}, {target_directory.as_posix()} has gone boom, "
-                f"will now delete this file"
-            )
+            # logging.exception(
+            #     f"Video {video_id}, {target_directory.as_posix()} has gone boom, "
+            #     f"will now delete this file"
+            # )
             return VideoDownloaderObject(success=False, video_id=video_id)
 
         metadata_output.video_store_filepath = video_filepath.as_posix()
@@ -254,10 +245,10 @@ def download_video_and_meta_data(
             time.sleep(sleep_duration)
 
         except Exception:
-            logging.exception(
-                f"Video {video_id}, {target_directory.as_posix()} has gone boom, "
-                f"will now delete this file. Exception was {sys.exc_info()[0]}"
-            )
+            # logging.exception(
+            #     f"Video {video_id}, {target_directory.as_posix()} has gone boom, "
+            #     f"will now delete this file. Exception was {sys.exc_info()[0]}"
+            # )
             return VideoDownloaderObject(success=False, video_id=video_id)
 
     return VideoDownloaderObject(success=True, video_id=video_id)
@@ -281,9 +272,9 @@ def search_for_video_ids(
 
         terms = re.findall(pattern=r"watch\?v=(\S{11})", string=html)[:n]
     except Exception:
-        logging.exception(
-            f"Couldn't find any search results for terms {terms_string}"
-        )
+        # logging.exception(
+        #     f"Couldn't find any search results for terms {terms_string}"
+        # )
         terms = []
 
     return terms
@@ -318,31 +309,32 @@ def search_and_download(
 
     completed = 0
     for video_id in video_ids:
-        if completed >= total_downloads_per_query:
-            break
+
         try:
             download_video_and_meta_data(
                 video_id=video_id,
-                sort_type=SortKeyStringToCode.relevance,
                 target_directory=target_dataset_dir,
                 resolution_identifier=resolution_identifier,
                 sleep_duration=sleep_duration,
             )
             completed += 1
-        except Exception:
+        except Exception as e:
             logging.exception(
                 f"Couldn't download video {video_id} for query {query_term}"
             )
 
+        if completed >= total_downloads_per_query:
+            break
+
 
 def main(
     target_dataset_dir: str,
-    resolution_identifier: str = "480p",
+    resolution_identifier: str = "360p",
     num_workers: int = 8,
     seed: int = 2306,
     pool_type: str = PoolType.thread,
     total_downloads_per_query: int = 1,
-    total_results_per_query: int = 100,
+    total_results_per_query: int = 200,
     sleep_duration: float = 1.0,
     starting_sample_idx: int = 0,
     ending_sample_idx: int = -1,
@@ -351,6 +343,11 @@ def main(
     # check if text is being piped and if so, read it and assume its query terms
     if not sys.stdin.isatty() and query_terms is None:
         query_terms = sys.stdin.read().splitlines()
+
+    target_dataset_dir = pathlib.Path(target_dataset_dir)
+
+    if not target_dataset_dir.exists():
+        target_dataset_dir.mkdir(parents=True, exist_ok=True)
 
     query_terms = query_terms[starting_sample_idx:ending_sample_idx]
     random.seed(seed)
@@ -362,16 +359,17 @@ def main(
     )
 
     with processor(max_workers=num_workers) as executor:
-        for query_term in tqdm(query_terms):
-            executor.submit(
+        with tqdm(total=len(query_terms)) as pbar:
+            for output in executor.map(
                 search_and_download,
-                query_term=query_term,
-                total_results_per_query=total_results_per_query,
-                sleep_duration=sleep_duration,
-                target_dataset_dir=target_dataset_dir,
-                total_downloads_per_query=total_downloads_per_query,
-                resolution_identifier=resolution_identifier,
-            )
+                query_terms,
+                [total_results_per_query] * len(query_terms),
+                [sleep_duration] * len(query_terms),
+                [target_dataset_dir] * len(query_terms),
+                [total_downloads_per_query] * len(query_terms),
+                [resolution_identifier] * len(query_terms),
+            ):
+                pbar.update(1)
 
 
 if __name__ == "__main__":
