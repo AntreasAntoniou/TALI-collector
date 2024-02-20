@@ -12,7 +12,10 @@ from rich.logging import RichHandler
 def get_logger():
     FORMAT = "%(message)s"
     logging.basicConfig(
-        level=logging.INFO, format=FORMAT, datefmt="[%X]", handlers=[RichHandler()]
+        level=logging.INFO,
+        format=FORMAT,
+        datefmt="[%X]",
+        handlers=[RichHandler()],
     )
 
     logger = logging.getLogger("rich")
@@ -90,7 +93,9 @@ def convert_keys_to_str(d: dict):
 def load_text_into_language_time_stamps(caption_dict: Dict):
 
     captions_matched = {
-        key: value for key, value in caption_dict.items() if key in ["a.en", "en"]
+        key: value
+        for key, value in caption_dict.items()
+        if key in ["a.en", "en"]
     }
 
     if len(captions_matched) > 1:
@@ -112,16 +117,18 @@ def load_text_into_language_time_stamps(caption_dict: Dict):
                 if child.text is not None
             ]
             if item.tag == "p" and children_text:
-                timestamp_to_caption_dict[
-                    float(item.attrib["t"]) / 1000
-                ] = children_text
+                timestamp_to_caption_dict[float(item.attrib["t"]) / 1000] = (
+                    children_text
+                )
 
         elif selected_key == "en":
             if item.tag == "p" and len(item.items()) == 2:
                 [(_, start), (_, dur)] = item.items()
 
                 timestamp_to_caption_dict[float(start) / 1000] = (
-                    item.text.replace("\n", " ") if item.text is not None else ""
+                    item.text.replace("\n", " ")
+                    if item.text is not None
+                    else ""
                 )
 
     return timestamp_to_caption_dict
@@ -144,9 +151,9 @@ def get_text_tokens(caption_dict, start_timestamp, end_timestamp):
     for current_start_timestamp in sorted(timestamp_to_caption_dict.keys()):
         current_start_timestamp_float = float(current_start_timestamp)
         if start_timestamp <= current_start_timestamp_float <= end_timestamp:
-            temp_timestamp_to_caption_dict[
-                current_start_timestamp_float
-            ] = timestamp_to_caption_dict[current_start_timestamp]
+            temp_timestamp_to_caption_dict[current_start_timestamp_float] = (
+                timestamp_to_caption_dict[current_start_timestamp]
+            )
 
         if current_start_timestamp_float > end_timestamp:
             break
