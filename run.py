@@ -8,7 +8,6 @@ import time
 import urllib.request
 from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor
 from dataclasses import dataclass
-from threading import Thread
 from typing import Any, Dict, List, Optional, Tuple, Union
 
 import fire
@@ -118,22 +117,22 @@ def fetch_video_meta_data_and_youtube_object(
     video_url = f"https://www.youtube.com/watch?v={video_id}"
 
     youtube_object = pytube.YouTube(video_url)
-    youtube_object.streams.all()
+    list(youtube_object.streams.fmt_streams)
+    print(f"Length of streams: {len(youtube_object.streams.fmt_streams)}")
+
+    print(f"captions: {youtube_object.captions}")
 
     caption_dict = dict()
 
     for caption_item in youtube_object.captions:
         caption_dict[f"{caption_item.code}"] = caption_item.xml_captions
+        print(caption_item.code, caption_item.name, caption_item.xml_captions)
 
-    if (
-        youtube_object.age_restricted is True
-        or "en" not in caption_dict
-        and "a.en" not in caption_dict
-    ):
+    if youtube_object.age_restricted is True:
+        raise Exception(f"Video {video_id} is age restricted")
 
-        raise Exception(
-            f"Video {video_id} is age restricted or has no captions"
-        )
+    if "en" not in caption_dict and "a.en" not in caption_dict:
+        raise Exception(f"No English captions found for video {video_id}")
 
     caption_dict = load_text_into_language_time_stamps(
         caption_dict=caption_dict
@@ -172,6 +171,7 @@ def download_video_and_meta_data(
         if isinstance(target_directory, str)
         else target_directory
     )
+    target_directory = target_directory / video_id
     time.sleep(sleep_duration)
     output = fetch_video_meta_data_and_youtube_object(video_id=video_id)
 
@@ -195,9 +195,7 @@ def download_video_and_meta_data(
         )
         return VideoDownloaderObject(success=False, video_id=video_id)
     else:
-        video_filepath = (
-            target_directory / str(video_id) / f"{resolution_identifier}.mp4"
-        )
+        video_filepath = target_directory / f"{resolution_identifier}.mp4"
 
         logging.info(
             f"Download "
@@ -220,17 +218,13 @@ def download_video_and_meta_data(
 
         except Exception:
             shutil.rmtree(target_directory.as_posix())
-            # logging.exception(
-            #     f"Video {video_id}, {target_directory.as_posix()} has gone boom, "
-            #     f"will now delete this file"
-            # )
             return VideoDownloaderObject(success=False, video_id=video_id)
 
         metadata_output.video_store_filepath = video_filepath.as_posix()
 
-        meta_data_table = target_directory / str(video_id) / "meta.yaml"
+        meta_data_table = target_directory / "meta.yaml"
 
-        caption_table = target_directory / str(video_id) / "captions.json"
+        caption_table = target_directory / "captions.json"
 
         if not meta_data_table.parent.exists():
             meta_data_table.parent.mkdir(parents=True, exist_ok=True)
@@ -245,10 +239,7 @@ def download_video_and_meta_data(
             time.sleep(sleep_duration)
 
         except Exception:
-            # logging.exception(
-            #     f"Video {video_id}, {target_directory.as_posix()} has gone boom, "
-            #     f"will now delete this file. Exception was {sys.exc_info()[0]}"
-            # )
+
             return VideoDownloaderObject(success=False, video_id=video_id)
 
     return VideoDownloaderObject(success=True, video_id=video_id)
@@ -272,9 +263,7 @@ def search_for_video_ids(
 
         terms = re.findall(pattern=r"watch\?v=(\S{11})", string=html)[:n]
     except Exception:
-        # logging.exception(
-        #     f"Couldn't find any search results for terms {terms_string}"
-        # )
+
         terms = []
 
     return terms
@@ -308,7 +297,7 @@ def search_and_download(
     )
 
     completed = 0
-    for video_id in video_ids:
+    for video_id in tqdm(video_ids):
 
         try:
             download_video_and_meta_data(
@@ -319,9 +308,7 @@ def search_and_download(
             )
             completed += 1
         except Exception as e:
-            logging.exception(
-                f"Couldn't download video {video_id} for query {query_term}"
-            )
+            logging.error(f"Error downloading video {video_id} - {e}")
 
         if completed >= total_downloads_per_query:
             break
